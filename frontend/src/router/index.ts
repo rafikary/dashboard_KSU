@@ -12,15 +12,21 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/DashboardPage.vue'),
       },
       {
-        path: 'customers',
-        name: 'Customers',
-        component: () => import('@/pages/CustomersPage.vue'),
+        path: 'branches',
+        name: 'Branches',
+        component: () => import('@/pages/BranchesPage.vue'),
       },
-      {
-        path: 'comparison',
-        name: 'Comparison',
-        component: () => import('@/pages/SalesComparisonPage.vue'),
-      },
+      // Disabled old routes (not relevant for KSU):
+      // {
+      //   path: 'customers',
+      //   name: 'Customers',
+      //   component: () => import('@/pages/CustomersPage.vue'),
+      // },
+      // {
+      //   path: 'comparison',
+      //   name: 'Comparison',
+      //   component: () => import('@/pages/SalesComparisonPage.vue'),
+      // },
     ],
   },
 ]

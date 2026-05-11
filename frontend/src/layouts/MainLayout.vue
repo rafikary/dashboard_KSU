@@ -27,9 +27,9 @@
             </div>
             <div class="flex-1 overflow-hidden whitespace-nowrap" v-show="!collapsed">
               <h1 class="text-xl font-bold" :class="isDark ? 'text-white' : 'bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent'">
-                QL Dashboard
+                KSU Dashboard
               </h1>
-              <p class="text-xs" :class="isDark ? 'text-gray-400' : 'text-gray-500'">Sales Analytics</p>
+              <p class="text-xs" :class="isDark ? 'text-gray-400' : 'text-gray-500'">Koperasi Simpan Pinjam</p>
             </div>
           </div>
 
@@ -162,7 +162,8 @@ import {
   SettingsOutline,
   LogOutOutline,
   MoonOutline,
-  SunnyOutline
+  SunnyOutline,
+  BusinessOutline
 } from '@vicons/ionicons5'
 
 // State for Sidebar & Dark Mode
@@ -177,18 +178,16 @@ const activeKey = computed(() => route.name as string)
 
 const pageTitle = computed(() => {
   const titles: Record<string, string> = {
-    Dashboard: 'Dashboard',
-    Customers: 'Data Customer',
-    Comparison: 'Perbandingan Penjualan',
+    Dashboard: 'Dashboard KSU',
+    Branches: 'Data Cabang',
   }
   return titles[activeKey.value] || 'Dashboard'
 })
 
 const pageDescription = computed(() => {
   const descriptions: Record<string, string> = {
-    Dashboard: 'Overview performa penjualan Anda',
-    Customers: 'Kelola dan monitor performa customer',
-    Comparison: 'Analisa perbandingan multi-periode',
+    Dashboard: 'Overview kesehatan keuangan KSU',
+    Branches: 'Monitor performa cabang dan NPL',
   }
   return descriptions[activeKey.value] || ''
 })
@@ -199,16 +198,18 @@ function renderIcon(icon: any) {
 
 const menuOptions: MenuOption[] = [
   { label: 'Dashboard', key: 'Dashboard', icon: renderIcon(HomeOutline) },
-  { label: 'Analisa Penjualan', key: 'sales', icon: renderIcon(TrendingUpOutline) },
-  { label: 'Perbandingan', key: 'Comparison', icon: renderIcon(SwapHorizontalOutline) },
-  { label: 'Data Customer', key: 'Customers', icon: renderIcon(PeopleOutline) },
-  { label: 'Analisa Kategori', key: 'categories', icon: renderIcon(GridOutline) },
-  { label: 'Geografis', key: 'geography', icon: renderIcon(MapOutline) },
-  { label: 'Marketing', key: 'marketing', icon: renderIcon(MegaphoneOutline) },
-  { label: 'Customer Menurun', key: 'declining', icon: renderIcon(WarningOutline) },
-  { label: 'Kualitas Data', key: 'data-quality', icon: renderIcon(StatsChartOutline) },
-  { label: 'AI Chatbot', key: 'chatbot', icon: renderIcon(ChatbubbleOutline) },
-  { label: 'Laporan', key: 'reports', icon: renderIcon(DocumentTextOutline) },
+  { label: 'Data Cabang', key: 'Branches', icon: renderIcon(BusinessOutline) },
+  // Disabled menu items (not relevant for KSU):
+  // { label: 'Analisa Penjualan', key: 'sales', icon: renderIcon(TrendingUpOutline) },
+  // { label: 'Perbandingan', key: 'Comparison', icon: renderIcon(SwapHorizontalOutline) },
+  // { label: 'Data Customer', key: 'Customers', icon: renderIcon(PeopleOutline) },
+  // { label: 'Analisa Kategori', key: 'categories', icon: renderIcon(GridOutline) },
+  // { label: 'Geografis', key: 'geography', icon: renderIcon(MapOutline) },
+  // { label: 'Marketing', key: 'marketing', icon: renderIcon(MegaphoneOutline) },
+  // { label: 'Customer Menurun', key: 'declining', icon: renderIcon(WarningOutline) },
+  // { label: 'Kualitas Data', key: 'data-quality', icon: renderIcon(StatsChartOutline) },
+  // { label: 'AI Chatbot', key: 'chatbot', icon: renderIcon(ChatbubbleOutline) },
+  // { label: 'Laporan', key: 'reports', icon: renderIcon(DocumentTextOutline) },
 ]
 
 const userOptions = [

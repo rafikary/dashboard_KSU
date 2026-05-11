@@ -1,201 +1,578 @@
 <template>
-  <div class="space-y-6">
-    <!-- Modern KPI Cards with Gradient -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+  <div class="dashboard-container space-y-5">
+    <!-- Compact KPI Cards -->
+    <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <n-skeleton height="120px" v-for="i in 4" :key="i" />
+    </div>
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       <div
         v-for="(metric, index) in metrics"
         :key="index"
-        class="glass-card rounded-3xl p-6 hover-lift cursor-pointer"
+        class="kpi-card"
         :style="{ animationDelay: `${index * 0.1}s` }"
       >
-        <div class="flex items-start justify-between mb-4">
-          <div>
-            <p class="text-sm text-gray-500 dark:text-gray-400 font-medium">{{ metric.label }}</p>
-            <h3 class="text-3xl font-bold mt-2 bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex-1">
+            <p class="kpi-label">{{ metric.label }}</p>
+            <h3 class="kpi-value" :style="{ color: metric.valueColor }">
               {{ formatValue(metric.value, metric.format) }}
             </h3>
+            <p v-if="metric.subtitle" class="kpi-subtitle">{{ metric.subtitle }}</p>
           </div>
-          <div
-            class="w-14 h-14 rounded-2xl flex items-center justify-center"
-            :class="metric.color"
-          >
-            <n-icon :component="metric.icon" size="28" class="text-white" />
+          <div class="kpi-icon" :style="{ background: metric.iconBg }">
+            <n-icon :component="metric.icon" size="22" class="text-white" />
           </div>
-        </div>
-        
-        <div class="flex items-center gap-2">
-          <n-tag
-            :type="metric.change >= 0 ? 'success' : 'error'"
-            size="small"
-            round
-            class="font-semibold"
-          >
-            <template #icon>
-              <n-icon :component="metric.change >= 0 ? TrendingUpOutline : TrendingDownOutline" />
-            </template>
-            {{ metric.change >= 0 ? '+' : '' }}{{ formatPercent(metric.change) }}
-          </n-tag>
-          <span class="text-xs text-gray-500 dark:text-gray-400">vs bulan lalu</span>
         </div>
       </div>
     </div>
 
-    <!-- Welcome Section with Gradient -->
-    <div class="glass-card rounded-3xl p-8 gradient-primary text-white overflow-hidden relative">
-      <div class="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32"></div>
-      <div class="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full -ml-24 -mb-24"></div>
-      
-      <div class="relative z-10">
-        <h2 class="text-3xl font-bold mb-2">Selamat Datang di QL Dashboard! 🎉</h2>
-        <p class="text-white/90 mb-6">
-          Dashboard analytics modern dengan komponen yang cantik dan powerful
-        </p>
-        
-        <div class="flex gap-4">
-          <n-button
-            type="default"
-            size="large"
-            round
-            class="bg-white/20 hover:bg-white/30 backdrop-blur-sm border-white/30"
-            @click="navigateTo('Customers')"
-          >
-            <template #icon>
-              <n-icon :component="PeopleOutline" />
-            </template>
-            Lihat Customer
-          </n-button>
-          <n-button
-            type="default"
-            size="large"
-            round
-            class="bg-white/20 hover:bg-white/30 backdrop-blur-sm border-white/30"
-            @click="navigateTo('Comparison')"
-          >
-            <template #icon>
-              <n-icon :component="StatsChartOutline" />
-            </template>
-            Analisa Perbandingan
-          </n-button>
-        </div>
+    <!-- Summary Info Bar -->
+    <div class="info-bar" v-if="summary">
+      <div class="info-item">
+        <span class="info-label">Total Cabang</span>
+        <span class="info-value">{{ summary.jumlah_cabang }} Cabang</span>
+      </div>
+      <div class="info-divider"></div>
+      <div class="info-item">
+        <span class="info-label">NPL Ratio</span>
+        <span class="info-value" :class="summary.npl_ratio > 10 ? 'text-red-600' : summary.npl_ratio > 5 ? 'text-orange-600' : 'text-green-600'">
+          {{ formatPercent(summary.npl_ratio) }}%
+        </span>
+      </div>
+      <div class="info-divider"></div>
+      <div class="info-item">
+        <span class="info-label">Collection Rate</span>
+        <span class="info-value text-blue-600">{{ formatPercent(summary.collection_rate) }}%</span>
+      </div>
+      <div class="info-divider"></div>
+      <div class="info-item">
+        <span class="info-label">Update Terakhir</span>
+        <span class="info-value">{{ summary.latest_date }}</span>
       </div>
     </div>
 
-    <!-- Quick Stats -->
-    <div class="glass-card rounded-3xl p-8">
-      <h3 class="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Fitur Unggulan</h3>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="flex items-start gap-4 p-4 rounded-2xl hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-colors">
-          <div class="w-12 h-12 rounded-xl bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center flex-shrink-0">
-            <n-icon :component="GridOutline" size="24" class="text-indigo-600 dark:text-indigo-400" />
-          </div>
-          <div>
-            <h4 class="font-semibold text-gray-800 dark:text-gray-200 mb-1">Interactive DataTable</h4>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-              Table dengan sorting, filter, search, dan export to Excel/CSV
-            </p>
-          </div>
+    <!-- Charts Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <!-- Trend Chart -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <h3 class="chart-title">Trend Pinjaman 6 Bulan Terakhir</h3>
+          <p class="chart-subtitle">Monitoring perkembangan pinjaman dan NPL</p>
         </div>
+        <div v-if="loadingCharts" class="chart-loading">
+          <n-spin size="large" />
+        </div>
+        <v-chart v-else :option="trendChartOption" style="height: 320px" autoresize />
+      </div>
 
-        <div class="flex items-start gap-4 p-4 rounded-2xl hover:bg-purple-50/50 dark:hover:bg-purple-900/20 transition-colors">
-          <div class="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center flex-shrink-0">
-            <n-icon :component="SwapHorizontalOutline" size="24" class="text-purple-600 dark:text-purple-400" />
-          </div>
-          <div>
-            <h4 class="font-semibold text-gray-800 dark:text-gray-200 mb-1">Comparison Mode</h4>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-              Bandingkan data antar periode dengan visualisasi yang cantik
-            </p>
-          </div>
+      <!-- NPL Ranking Chart -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <h3 class="chart-title">Top 10 Cabang NPL Tertinggi</h3>
+          <p class="chart-subtitle">Ranking berdasarkan NPL ratio</p>
         </div>
+        <div v-if="loadingCharts" class="chart-loading">
+          <n-spin size="large" />
+        </div>
+        <v-chart v-else :option="nplRankingOption" style="height: 320px" autoresize />
+      </div>
 
-        <div class="flex items-start gap-4 p-4 rounded-2xl hover:bg-pink-50/50 dark:hover:bg-pink-900/20 transition-colors">
-          <div class="w-12 h-12 rounded-xl bg-pink-100 dark:bg-pink-900/50 flex items-center justify-center flex-shrink-0">
-            <n-icon :component="TrendingUpOutline" size="24" class="text-pink-600 dark:text-pink-400" />
-          </div>
-          <div>
-            <h4 class="font-semibold text-gray-800 dark:text-gray-200 mb-1">Real-time Analytics</h4>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-              Monitoring performa penjualan secara real-time
-            </p>
-          </div>
+      <!-- Collection Rate Distribution -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <h3 class="chart-title">Distribusi Collection Rate</h3>
+          <p class="chart-subtitle">Persentase cabang per kategori collection</p>
         </div>
+        <div v-if="loadingCharts" class="chart-loading">
+          <n-spin size="large" />
+        </div>
+        <v-chart v-else :option="collectionDistOption" style="height: 320px" autoresize />
+      </div>
+
+      <!-- Liquidity Overview -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <h3 class="chart-title">Overview Likuiditas</h3>
+          <p class="chart-subtitle">Komposisi kas dan bank</p>
+        </div>
+        <div v-if="loadingCharts" class="chart-loading">
+          <n-spin size="large" />
+        </div>
+        <v-chart v-else :option="liquidityOption" style="height: 320px" autoresize />
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { NButton, NIcon, NTag } from 'naive-ui'
+import { ref, onMounted, computed } from 'vue'
+import { NIcon, NSkeleton, NSpin } from 'naive-ui'
+import { use } from 'echarts/core'
+import { CanvasRenderer } from 'echarts/renderers'
+import { LineChart, BarChart, PieChart } from 'echarts/charts'
+import {
+  TitleComponent,
+  TooltipComponent,
+  LegendComponent,
+  GridComponent,
+} from 'echarts/components'
+import VChart from 'vue-echarts'
 import {
   CashOutline,
-  CartOutline,
-  PeopleOutline,
-  TrendingUpOutline,
+  WalletOutline,
+  BusinessOutline,
   TrendingDownOutline,
-  StatsChartOutline,
-  GridOutline,
-  SwapHorizontalOutline,
 } from '@vicons/ionicons5'
 
-const router = useRouter()
+use([
+  CanvasRenderer,
+  LineChart,
+  BarChart,
+  PieChart,
+  TitleComponent,
+  TooltipComponent,
+  LegendComponent,
+  GridComponent,
+])
+
+const loading = ref(true)
+const loadingCharts = ref(true)
+const summary = ref<any>(null)
+const trendData = ref<any[]>([])
+const branchesData = ref<any[]>([])
 
 const metrics = ref([
   {
-    label: 'Total Omzet',
-    value: 2500000000,
-    change: 13.6,
+    label: 'Total Pinjaman',
+    value: 0,
+    subtitle: '',
     format: 'currency',
     icon: CashOutline,
-    color: 'gradient-primary',
+    valueColor: '#3b82f6',
+    iconBg: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
   },
   {
-    label: 'Total Transaksi',
-    value: 1250,
-    change: 5.9,
-    format: 'number',
-    icon: CartOutline,
-    color: 'gradient-success',
-  },
-  {
-    label: 'Customer Aktif',
-    value: 342,
-    change: 4.3,
-    format: 'number',
-    icon: PeopleOutline,
-    color: 'bg-gradient-to-br from-pink-500 to-rose-500',
-  },
-  {
-    label: 'Avg. Transaksi',
-    value: 2000000,
-    change: 7.3,
+    label: 'Sisa Pinjaman',
+    value: 0,
+    subtitle: '',
     format: 'currency',
-    icon: TrendingUpOutline,
-    color: 'bg-gradient-to-br from-amber-500 to-orange-500',
+    icon: WalletOutline,
+    valueColor: '#10b981',
+    iconBg: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+  },
+  {
+    label: 'Jasa Tertunggak',
+    value: 0,
+    subtitle: '',
+    format: 'currency',
+    icon: TrendingDownOutline,
+    valueColor: '#ef4444',
+    iconBg: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+  },
+  {
+    label: 'Total Likuiditas',
+    value: 0,
+    subtitle: 'Kas + Bank',
+    format: 'currency',
+    icon: BusinessOutline,
+    valueColor: '#f59e0b',
+    iconBg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
   },
 ])
 
+async function fetchData() {
+  try {
+    loading.value = true
+    loadingCharts.value = true
+
+    const summaryRes = await fetch('http://localhost:5000/api/ksu/summary')
+    const summaryData = await summaryRes.json()
+    summary.value = summaryData
+
+    const now = new Date()
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1)
+    const trendRes = await fetch(`http://localhost:5000/api/ksu/trend?granularity=month&date_from=${sixMonthsAgo.toISOString().split('T')[0]}`)
+    const trendResult = await trendRes.json()
+    trendData.value = trendResult.data || []
+
+    const branchesRes = await fetch('http://localhost:5000/api/ksu/branches?sort_by=npl_ratio&order=desc')
+    const branchesResult = await branchesRes.json()
+    branchesData.value = branchesResult.branches || []
+
+    metrics.value[0].value = summaryData.total_pinjaman
+    metrics.value[0].subtitle = `${summaryData.jumlah_cabang} Cabang`
+
+    metrics.value[1].value = summaryData.total_sisa_pinjaman
+    metrics.value[1].subtitle = `${summaryData.collection_rate.toFixed(1)}% terkumpul`
+
+    metrics.value[2].value = summaryData.total_jasa_tertunggak
+    metrics.value[2].subtitle = `NPL: Rp ${(summaryData.total_sisa_pinjaman_np / 1e9).toFixed(1)}M`
+
+    metrics.value[3].value = summaryData.total_saldo_kas + summaryData.total_saldo_bank
+    metrics.value[3].subtitle = `Bank: Rp ${(summaryData.total_saldo_bank / 1e9).toFixed(1)}M`
+
+  } catch (error) {
+    console.error('Error fetching data:', error)
+  } finally {
+    loading.value = false
+    loadingCharts.value = false
+  }
+}
+
+const trendChartOption = computed(() => ({
+  tooltip: {
+    trigger: 'axis',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderColor: '#e5e7eb',
+    borderWidth: 1,
+    textStyle: { color: '#374151', fontSize: 12 },
+  },
+  legend: {
+    data: ['Sisa Pinjaman', 'NPL Ratio'],
+    bottom: 0,
+    textStyle: { fontSize: 11, color: '#6b7280' }
+  },
+  grid: { left: '3%', right: '4%', bottom: '12%', top: '8%', containLabel: true },
+  xAxis: {
+    type: 'category',
+    data: trendData.value.map(d => {
+      const date = new Date(d.period)
+      return date.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' })
+    }),
+    axisLabel: { fontSize: 11, color: '#6b7280' },
+    axisLine: { lineStyle: { color: '#e5e7eb' } }
+  },
+  yAxis: [
+    {
+      type: 'value',
+      name: 'Miliar Rp',
+      nameTextStyle: { fontSize: 11, color: '#6b7280' },
+      axisLabel: { 
+        fontSize: 11, 
+        color: '#6b7280',
+        formatter: (val: number) => `${(val / 1e9).toFixed(0)}`
+      },
+      splitLine: { lineStyle: { color: '#f3f4f6' } }
+    },
+    {
+      type: 'value',
+      name: 'NPL %',
+      nameTextStyle: { fontSize: 11, color: '#6b7280' },
+      axisLabel: { fontSize: 11, color: '#6b7280', formatter: '{value}%' },
+      splitLine: { show: false }
+    }
+  ],
+  series: [
+    {
+      name: 'Sisa Pinjaman',
+      type: 'line',
+      data: trendData.value.map(d => d.sisa_pinjaman),
+      smooth: true,
+      symbol: 'circle',
+      symbolSize: 6,
+      lineStyle: { width: 2.5, color: '#3b82f6' },
+      itemStyle: { color: '#3b82f6' },
+      areaStyle: {
+        color: {
+          type: 'linear',
+          x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [
+            { offset: 0, color: 'rgba(59, 130, 246, 0.25)' },
+            { offset: 1, color: 'rgba(59, 130, 246, 0.05)' }
+          ]
+        }
+      }
+    },
+    {
+      name: 'NPL Ratio',
+      type: 'line',
+      yAxisIndex: 1,
+      data: trendData.value.map(d => d.npl_ratio),
+      smooth: true,
+      symbol: 'circle',
+      symbolSize: 6,
+      lineStyle: { width: 2.5, color: '#ef4444' },
+      itemStyle: { color: '#ef4444' }
+    }
+  ]
+}))
+
+const nplRankingOption = computed(() => {
+  const top10 = branchesData.value.slice(0, 10)
+  return {
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+      borderColor: '#e5e7eb',
+      borderWidth: 1,
+      textStyle: { color: '#374151', fontSize: 12 },
+    },
+    grid: { left: '15%', right: '4%', bottom: '3%', top: '3%', containLabel: true },
+    xAxis: {
+      type: 'value',
+      axisLabel: { fontSize: 11, color: '#6b7280', formatter: '{value}%' },
+      splitLine: { lineStyle: { color: '#f3f4f6' } }
+    },
+    yAxis: {
+      type: 'category',
+      data: top10.map(b => b.kode),
+      axisLabel: { fontSize: 11, color: '#6b7280' },
+      axisLine: { lineStyle: { color: '#e5e7eb' } }
+    },
+    series: [{
+      type: 'bar',
+      data: top10.map(b => ({
+        value: b.npl_ratio,
+        itemStyle: {
+          color: b.npl_ratio > 50 ? '#dc2626' : b.npl_ratio > 30 ? '#ef4444' : b.npl_ratio > 10 ? '#f59e0b' : '#10b981'
+        }
+      })),
+      barWidth: '60%',
+      label: {
+        show: true,
+        position: 'right',
+        formatter: '{c}%',
+        fontSize: 11,
+        color: '#374151'
+      }
+    }]
+  }
+})
+
+const collectionDistOption = computed(() => {
+  const excellent = branchesData.value.filter(b => b.collection_rate >= 80).length
+  const good = branchesData.value.filter(b => b.collection_rate >= 60 && b.collection_rate < 80).length
+  const fair = branchesData.value.filter(b => b.collection_rate >= 40 && b.collection_rate < 60).length
+  const poor = branchesData.value.filter(b => b.collection_rate < 40).length
+
+  return {
+    tooltip: {
+      trigger: 'item',
+      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+      borderColor: '#e5e7eb',
+      borderWidth: 1,
+      textStyle: { color: '#374151', fontSize: 12 },
+      formatter: '{b}: {c} cabang ({d}%)'
+    },
+    legend: {
+      orient: 'vertical',
+      right: '10%',
+      top: 'center',
+      textStyle: { fontSize: 11, color: '#6b7280' }
+    },
+    series: [{
+      type: 'pie',
+      radius: ['40%', '70%'],
+      center: ['35%', '50%'],
+      avoidLabelOverlap: false,
+      label: {
+        show: false
+      },
+      emphasis: {
+        label: {
+          show: true,
+          fontSize: 14,
+          fontWeight: 'bold'
+        }
+      },
+      data: [
+        { value: excellent, name: 'Excellent (≥80%)', itemStyle: { color: '#10b981' } },
+        { value: good, name: 'Good (60-79%)', itemStyle: { color: '#3b82f6' } },
+        { value: fair, name: 'Fair (40-59%)', itemStyle: { color: '#f59e0b' } },
+        { value: poor, name: 'Poor (<40%)', itemStyle: { color: '#ef4444' } }
+      ]
+    }]
+  }
+})
+
+const liquidityOption = computed(() => ({
+  tooltip: {
+    trigger: 'item',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderColor: '#e5e7eb',
+    borderWidth: 1,
+    textStyle: { color: '#374151', fontSize: 12 },
+  },
+  legend: {
+    orient: 'vertical',
+    right: '10%',
+    top: 'center',
+    textStyle: { fontSize: 11, color: '#6b7280' }
+  },
+  series: [{
+    type: 'pie',
+    radius: ['40%', '70%'],
+    center: ['35%', '50%'],
+    data: [
+      { 
+        value: summary.value?.total_saldo_kas || 0, 
+        name: 'Saldo Kas',
+        itemStyle: { color: '#3b82f6' }
+      },
+      { 
+        value: summary.value?.total_saldo_bank || 0, 
+        name: 'Saldo Bank',
+        itemStyle: { color: '#10b981' }
+      }
+    ],
+    label: {
+      fontSize: 11,
+      color: '#374151',
+      formatter: '{b}\n{d}%'
+    },
+    emphasis: {
+      label: {
+        show: true,
+        fontSize: 14,
+        fontWeight: 'bold'
+      }
+    }
+  }]
+}))
+
+onMounted(() => {
+  fetchData()
+})
+
 function formatValue(value: number, format?: string) {
   if (format === 'currency') {
-    if (value >= 1e9) return `Rp ${(value / 1e9).toFixed(1)} M`
-    if (value >= 1e6) return `Rp ${(value / 1e6).toFixed(1)} Jt`
+    if (value >= 1e9) return `Rp ${(value / 1e9).toFixed(1)}M`
+    if (value >= 1e6) return `Rp ${(value / 1e6).toFixed(1)}Jt`
     return `Rp ${value.toLocaleString('id-ID')}`
   }
   return value.toLocaleString('id-ID')
 }
 
 function formatPercent(value: number) {
-  return `${Math.abs(value).toFixed(1)}%`
-}
-
-function navigateTo(name: string) {
-  router.push({ name })
+  return Math.abs(value).toFixed(1)
 }
 </script>
 
 <style scoped>
-@keyframes slideUp {
+.dashboard-container {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.kpi-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 18px;
+  transition: all 0.3s ease;
+  animation: fadeInUp 0.5s ease-out forwards;
+}
+
+.kpi-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.kpi-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.kpi-value {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+
+.kpi-subtitle {
+  font-size: 11px;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.kpi-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.info-bar {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  animation: fadeInUp 0.6s ease-out forwards;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.info-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.info-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: white;
+}
+
+.info-divider {
+  width: 1px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.chart-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+  animation: fadeInUp 0.7s ease-out forwards;
+}
+
+.chart-header {
+  margin-bottom: 16px;
+}
+
+.chart-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 4px;
+}
+
+.chart-subtitle {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.chart-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 320px;
+}
+
+@keyframes fadeInUp {
   from {
     opacity: 0;
     transform: translateY(20px);
@@ -204,9 +581,5 @@ function navigateTo(name: string) {
     opacity: 1;
     transform: translateY(0);
   }
-}
-
-.glass-card {
-  animation: slideUp 0.5s ease-out forwards;
 }
 </style>
