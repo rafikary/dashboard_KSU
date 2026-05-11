@@ -1,0 +1,165 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  
+  body {
+    @apply bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50;
+    @apply dark:bg-gradient-to-br dark:from-gray-950 dark:via-slate-900 dark:to-indigo-950;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    margin: 0;
+    padding: 0;
+    transition: background 0.3s ease;
+    position: relative;
+  }
+
+  /* Animated background pattern for dark mode */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 0;
+  }
+
+  html.dark body::before {
+    opacity: 0.03;
+    background-image: 
+      radial-gradient(circle at 20% 50%, rgba(99, 102, 241, 0.5) 0%, transparent 50%),
+      radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.5) 0%, transparent 50%),
+      radial-gradient(circle at 40% 90%, rgba(59, 130, 246, 0.5) 0%, transparent 50%);
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/90 backdrop-blur-xl border border-gray-200/50 shadow-xl;
+    @apply dark:bg-gray-800/90 dark:border-gray-700/50 dark:shadow-2xl;
+    transition: all 0.3s ease;
+    position: relative;
+    z-index: 1;
+  }
+
+  .glass-card:hover {
+    @apply bg-white/95 border-gray-200/70;
+    @apply dark:bg-gray-800/95 dark:border-gray-600/60;
+  }
+
+  .glass-sidebar {
+    @apply bg-white/95 backdrop-blur-2xl border-r border-gray-200/50;
+    @apply dark:bg-gray-900/95 dark:border-gray-700/50;
+    transition: all 0.3s ease;
+    position: relative;
+    z-index: 10;
+  }
+
+  .glass-header {
+    @apply bg-white/80 backdrop-blur-2xl border-b border-gray-200/50;
+    @apply dark:bg-gray-900/80 dark:border-gray-700/50;
+    transition: all 0.3s ease;
+    position: relative;
+    z-index: 10;
+  }
+  
+  .gradient-bg {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+  
+  .gradient-primary {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  }
+  
+  .gradient-success {
+    background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+  }
+  
+  .gradient-error {
+    background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+  }
+  
+  .hover-lift {
+    @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.6s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Glow effect for dark mode cards */
+  html.dark .glass-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: inherit;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+  }
+
+  html.dark .glass-card:hover::after {
+    opacity: 1;
+  }
+}
+
+/* Custom scrollbar - Light Mode */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-slate-100 dark:bg-gray-800;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-300 dark:bg-gray-600 rounded;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-400 dark:bg-gray-500;
+}
+
+/* Dark mode transition for all elements */
+* {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+/* Selection color for dark mode */
+::selection {
+  @apply bg-indigo-500/30 dark:bg-indigo-400/30;
+}
+
+/* Focus ring for dark mode */
+:focus-visible {
+  @apply outline-none ring-2 ring-indigo-500 dark:ring-indigo-400 ring-offset-2 dark:ring-offset-gray-900;
+}
