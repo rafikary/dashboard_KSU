@@ -44,16 +44,31 @@ def ksu_summary():
     latest_df = df.sort_values('tglnominatif').groupby('kode').last().reset_index()
     
     # Calculate summary
+    total_pinjaman = latest_df['pinjaman'].sum()
+    total_sisa_pinjaman = latest_df['sisapinjaman'].sum()
+    total_jasa_ttg = latest_df['totaljasattg'].sum()
+    total_jasa_ttg_1 = latest_df['jasattg1'].sum()
+    total_jasa_ttg_2 = latest_df['jasattg2'].sum()
+    total_jasa_ttg_3 = latest_df['jasattg3'].sum()
+    total_jasa_ttg_np = latest_df['jasattgnp'].sum()
+    total_sisa_pinjaman_np = latest_df['sisapinjamannp'].sum()
+    
     summary = {
-        'total_pinjaman': float(latest_df['pinjaman'].sum()),
-        'total_sisa_pinjaman': float(latest_df['sisapinjaman'].sum()),
-        'total_jasa_tertunggak': float(latest_df['totaljasattg'].sum()),
-        'total_sisa_pinjaman_np': float(latest_df['sisapinjamannp'].sum()),
+        'total_pinjaman': float(total_pinjaman),
+        'total_sisa_pinjaman': float(total_sisa_pinjaman),
+        'total_jasa_tertunggak': float(total_jasa_ttg),
+        'total_jasa_ttg_1': float(total_jasa_ttg_1),
+        'total_jasa_ttg_2': float(total_jasa_ttg_2),
+        'total_jasa_ttg_3': float(total_jasa_ttg_3),
+        'total_jasa_ttg_np': float(total_jasa_ttg_np),
+        'jasa_ttg_ratio': float((total_jasa_ttg / total_sisa_pinjaman * 100) if total_sisa_pinjaman > 0 else 0),
+        'total_sisa_pinjaman_np': float(total_sisa_pinjaman_np),
+        'npl_ratio': float((total_sisa_pinjaman_np / total_sisa_pinjaman * 100) if total_sisa_pinjaman > 0 else 0),
+        'npl_amount_ratio': float((total_sisa_pinjaman_np / total_pinjaman * 100) if total_pinjaman > 0 else 0),
         'total_saldo_kas': float(latest_df['saldokas'].sum()),
         'total_saldo_bank': float(latest_df['saldobank'].sum()),
         'jumlah_cabang': int(latest_df['kode'].nunique()),
-        'npl_ratio': float((latest_df['sisapinjamannp'].sum() / latest_df['sisapinjaman'].sum() * 100) if latest_df['sisapinjaman'].sum() > 0 else 0),
-        'collection_rate': float(((latest_df['pinjaman'].sum() - latest_df['sisapinjaman'].sum()) / latest_df['pinjaman'].sum() * 100) if latest_df['pinjaman'].sum() > 0 else 0),
+        'collection_rate': float(((total_pinjaman - total_sisa_pinjaman) / total_pinjaman * 100) if total_pinjaman > 0 else 0),
         'latest_date': df['tglnominatif'].max().strftime('%Y-%m-%d') if not df.empty else None
     }
     
@@ -66,6 +81,8 @@ def list_branches():
     Get list of branches with their latest statistics
     Query params:
     - date: specific date (YYYY-MM-DD), default to latest
+    - date_from: start date (YYYY-MM-DD)
+    - date_to: end date (YYYY-MM-DD)
     - sort_by: field to sort by (default: sisapinjaman)
     - order: asc or desc (default: desc)
     """
@@ -74,8 +91,19 @@ def list_branches():
     if df.empty:
         return jsonify({'branches': [], 'total': 0}), 200
     
-    # Get date parameter
+    # Backward-compatible snapshot parameter
     date_param = request.args.get('date')
+    date_from = request.args.get('date_from')
+    date_to = request.args.get('date_to')
+
+    if date_from:
+        df = df[df['tglnominatif'] >= pd.to_datetime(date_from)]
+    if date_to:
+        df = df[df['tglnominatif'] <= pd.to_datetime(date_to)]
+
+    if df.empty:
+        return jsonify({'branches': [], 'total': 0}), 200
+
     if date_param:
         target_date = pd.to_datetime(date_param)
         # Get closest date per branch
@@ -89,13 +117,24 @@ def list_branches():
     
     # Calculate additional metrics
     df_latest['npl_ratio'] = (df_latest['sisapinjamannp'] / df_latest['sisapinjaman'] * 100).fillna(0)
+    df_latest['npl_amount_ratio'] = (df_latest['sisapinjamannp'] / df_latest['pinjaman'] * 100).fillna(0)
     df_latest['collection_rate'] = ((df_latest['pinjaman'] - df_latest['sisapinjaman']) / df_latest['pinjaman'] * 100).fillna(0)
     df_latest['total_liquidity'] = df_latest['saldokas'] + df_latest['saldobank']
+    df_latest['jasa_ttg_ratio'] = (df_latest['totaljasattg'] / df_latest['sisapinjaman'] * 100).fillna(0)
     
     # Sort
     sort_by = request.args.get('sort_by', 'sisapinjaman')
     order = request.args.get('order', 'desc')
     ascending = order == 'asc'
+
+    sort_alias = {
+        'sisa_pinjaman': 'sisapinjaman',
+        'total_jasa_ttg': 'totaljasattg',
+        'sisa_pinjaman_np': 'sisapinjamannp',
+        'saldo_kas': 'saldokas',
+        'saldo_bank': 'saldobank',
+    }
+    sort_by = sort_alias.get(sort_by, sort_by)
     
     if sort_by in df_latest.columns:
         df_latest = df_latest.sort_values(sort_by, ascending=ascending)
@@ -114,10 +153,12 @@ def list_branches():
             'jasa_ttg_3': float(row['jasattg3']),
             'jasa_ttg_np': float(row['jasattgnp']),
             'total_jasa_ttg': float(row['totaljasattg']),
+            'jasa_ttg_ratio': float(row['jasa_ttg_ratio']),
             'sisa_pinjaman_np': float(row['sisapinjamannp']),
+            'npl_ratio': float(row['npl_ratio']),
+            'npl_amount_ratio': float(row['npl_amount_ratio']),
             'saldo_kas': float(row['saldokas']),
             'saldo_bank': float(row['saldobank']),
-            'npl_ratio': float(row['npl_ratio']),
             'collection_rate': float(row['collection_rate']),
             'total_liquidity': float(row['total_liquidity']),
             'tanggal': row['tglnominatif'].strftime('%Y-%m-%d')
@@ -329,6 +370,93 @@ def npl_ranking():
         'ranking': ranking,
         'total': len(ranking),
         'date': df_latest['tglnominatif'].max().strftime('%Y-%m-%d')
+    })
+
+
+@ksu_bp.route('/api/ksu/report/summary')
+def summary_report():
+    """
+    Generate summary report in official format (matching LAPORAN SUMMARY KOPERASI)
+    Query params:
+    - date: specific date (YYYY-MM-DD), default to latest
+    
+    Returns data matching the official report structure with tunggakan jasa breakdown
+    """
+    df = get_ksu_df()
+    
+    if df.empty:
+        return jsonify({'error': 'No data available'}), 404
+    
+    # Get date parameter
+    date_param = request.args.get('date')
+    if date_param:
+        target_date = pd.to_datetime(date_param)
+        df_filtered = df[df['tglnominatif'] <= target_date]
+        if df_filtered.empty:
+            return jsonify({'error': 'No data available for specified date'}), 404
+        df_latest = df_filtered.sort_values('tglnominatif').groupby('kode').last().reset_index()
+        report_date = target_date.strftime('%d %B %Y')
+    else:
+        df_latest = df.sort_values('tglnominatif').groupby('kode').last().reset_index()
+        report_date = df['tglnominatif'].max().strftime('%d %B %Y')
+    
+    # Calculate all metrics
+    df_latest['tunggakan_jasa_pct'] = (df_latest['totaljasattg'] / df_latest['sisapinjaman'] * 100).fillna(0)
+    df_latest['kredit_npl_pct'] = (df_latest['sisapinjamannp'] / df_latest['sisapinjaman'] * 100).fillna(0)
+    
+    # Sort by nama for consistent ordering
+    df_latest = df_latest.sort_values('nama')
+    
+    # Build report data
+    report_data = []
+    for idx, (_, row) in enumerate(df_latest.iterrows(), 1):
+        report_data.append({
+            'no': idx,
+            'nama_koperasi': row['nama'],
+            'kode': row['kode'],
+            'flag': row['flag'],
+            'kredit': float(row['sisapinjaman']),
+            'tunggakan_jasa': {
+                '1_bulan': float(row['jasattg1']),
+                '2_bulan': float(row['jasattg2']),
+                '3_bulan': float(row['jasattg3']),
+                'npl': float(row['jasattgnp']),
+                'total': float(row['totaljasattg']),
+                'persen': float(row['tunggakan_jasa_pct'])
+            },
+            'kredit_npl': {
+                'amount': float(row['sisapinjamannp']),
+                'persen': float(row['kredit_npl_pct'])
+            },
+            'saldo_kas': float(row['saldokas']),
+            'saldo_bank': float(row['saldobank'])
+        })
+    
+    # Calculate totals
+    totals = {
+        'kredit': float(df_latest['sisapinjaman'].sum()),
+        'tunggakan_jasa': {
+            '1_bulan': float(df_latest['jasattg1'].sum()),
+            '2_bulan': float(df_latest['jasattg2'].sum()),
+            '3_bulan': float(df_latest['jasattg3'].sum()),
+            'npl': float(df_latest['jasattgnp'].sum()),
+            'total': float(df_latest['totaljasattg'].sum()),
+            'persen': float((df_latest['totaljasattg'].sum() / df_latest['sisapinjaman'].sum() * 100) if df_latest['sisapinjaman'].sum() > 0 else 0)
+        },
+        'kredit_npl': {
+            'amount': float(df_latest['sisapinjamannp'].sum()),
+            'persen': float((df_latest['sisapinjamannp'].sum() / df_latest['sisapinjaman'].sum() * 100) if df_latest['sisapinjaman'].sum() > 0 else 0)
+        },
+        'saldo_kas': float(df_latest['saldokas'].sum()),
+        'saldo_bank': float(df_latest['saldobank'].sum())
+    }
+    
+    return jsonify({
+        'report_title': 'LAPORAN SUMMARY KOPERASI',
+        'report_date': report_date,
+        'data': report_data,
+        'totals': totals,
+        'jumlah_koperasi': len(df_latest)
     })
 
 

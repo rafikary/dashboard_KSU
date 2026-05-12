@@ -12,11 +12,33 @@
 
     <!-- Filters -->
     <div class="glass-card rounded-2xl p-6">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <n-select
+          v-model:value="filterMode"
+          :options="filterModeOptions"
+          class="w-full"
+        />
         <n-date-picker
-          v-model:value="dateFilter"
+          v-if="filterMode === 'date'"
+          v-model:value="selectedDate"
           type="date"
           placeholder="Pilih Tanggal"
+          clearable
+          class="w-full"
+        />
+        <n-date-picker
+          v-else-if="filterMode === 'month'"
+          v-model:value="selectedMonth"
+          type="month"
+          placeholder="Pilih Bulan"
+          clearable
+          class="w-full"
+        />
+        <n-date-picker
+          v-else
+          v-model:value="selectedYear"
+          type="year"
+          placeholder="Pilih Tahun"
           clearable
           class="w-full"
         />
@@ -32,7 +54,9 @@
           placeholder="Urutan"
           class="w-full"
         />
+        <n-button type="primary" @click="applyFilter">Terapkan Filter</n-button>
       </div>
+      <p class="text-xs text-gray-500 mt-3">Data performa cabang dan semua angka akan menyesuaikan tanggal, bulan, atau tahun pilihan Anda.</p>
     </div>
 
     <!-- Summary Cards -->
@@ -50,10 +74,11 @@
         </div>
       </div>
       <div class="glass-card rounded-2xl p-6">
-        <div class="text-sm text-gray-500 dark:text-gray-400">NPL Ratio</div>
+        <div class="text-sm text-gray-500 dark:text-gray-400">Rasio NPL (Rata-rata per Cabang)</div>
         <div class="text-2xl font-bold mt-2" :class="nplColor">
           {{ avgNPL.toFixed(2) }}%
         </div>
+        <div class="text-xs text-gray-400 mt-1">Pinjaman menunggak >3 bulan</div>
       </div>
       <div class="glass-card rounded-2xl p-6">
         <div class="text-sm text-gray-500 dark:text-gray-400">Collection Rate</div>
@@ -87,6 +112,10 @@
             <div class="font-bold">{{ selectedBranch.nama }}</div>
           </div>
           <div>
+            <div class="text-sm text-gray-500">Flag (Jenis)</div>
+            <div class="font-bold">{{ selectedBranch.flag }} <span class="text-xs text-gray-400">({{ selectedBranch.flag === 'A' ? 'Pajak' : 'Non Pajak' }})</span></div>
+          </div>
+          <div>
             <div class="text-sm text-gray-500">Total Pinjaman</div>
             <div class="font-bold">{{ formatCurrency(selectedBranch.pinjaman) }}</div>
           </div>
@@ -95,27 +124,27 @@
             <div class="font-bold">{{ formatCurrency(selectedBranch.sisa_pinjaman) }}</div>
           </div>
           <div>
-            <div class="text-sm text-gray-500">Jasa Tertunggak 1</div>
+            <div class="text-sm text-gray-500">Jasa Tertunggak 1 Bulan</div>
             <div class="font-bold">{{ formatCurrency(selectedBranch.jasa_ttg_1) }}</div>
           </div>
           <div>
-            <div class="text-sm text-gray-500">Jasa Tertunggak 2</div>
+            <div class="text-sm text-gray-500">Jasa Tertunggak 2 Bulan</div>
             <div class="font-bold">{{ formatCurrency(selectedBranch.jasa_ttg_2) }}</div>
           </div>
           <div>
-            <div class="text-sm text-gray-500">Jasa Tertunggak 3</div>
+            <div class="text-sm text-gray-500">Jasa Tertunggak 3 Bulan</div>
             <div class="font-bold">{{ formatCurrency(selectedBranch.jasa_ttg_3) }}</div>
           </div>
           <div>
-            <div class="text-sm text-gray-500">Jasa Tertunggak NP</div>
+            <div class="text-sm text-gray-500">Jasa Tertunggak NP (>3 Bulan)</div>
             <div class="font-bold">{{ formatCurrency(selectedBranch.jasa_ttg_np) }}</div>
           </div>
           <div>
-            <div class="text-sm text-gray-500">Sisa Pinjaman NP</div>
+            <div class="text-sm text-gray-500">Sisa Pinjaman NP (Menunggak >3 Bulan)</div>
             <div class="font-bold text-red-600">{{ formatCurrency(selectedBranch.sisa_pinjaman_np) }}</div>
           </div>
           <div>
-            <div class="text-sm text-gray-500">NPL Ratio</div>
+            <div class="text-sm text-gray-500">Rasio NPL (>3 Bulan)</div>
             <div class="font-bold text-red-600">{{ selectedBranch.npl_ratio.toFixed(2) }}%</div>
           </div>
           <div>
@@ -148,15 +177,24 @@ import type { DataTableColumns } from 'naive-ui'
 
 const loading = ref(true)
 const branches = ref<any[]>([])
-const dateFilter = ref<number | null>(null)
+const filterMode = ref<'date' | 'month' | 'year'>('date')
+const selectedDate = ref<number | null>(null)
+const selectedMonth = ref<number | null>(null)
+const selectedYear = ref<number | null>(null)
 const sortBy = ref('sisapinjaman')
 const sortOrder = ref('desc')
 const showDetailModal = ref(false)
 const selectedBranch = ref<any>(null)
 
+const filterModeOptions = [
+  { label: 'Filter Tanggal', value: 'date' },
+  { label: 'Filter Bulan', value: 'month' },
+  { label: 'Filter Tahun', value: 'year' },
+]
+
 const sortOptions = [
   { label: 'Sisa Pinjaman', value: 'sisa_pinjaman' },
-  { label: 'NPL Ratio', value: 'npl_ratio' },
+  { label: 'Rasio NPL (>3 Bulan)', value: 'npl_ratio' },
   { label: 'Total Jasa Tertunggak', value: 'total_jasa_ttg' },
   { label: 'Collection Rate', value: 'collection_rate' },
   { label: 'Total Likuiditas', value: 'total_liquidity' },
@@ -192,7 +230,7 @@ const columns: DataTableColumns = [
     sorter: (a: any, b: any) => a.sisa_pinjaman - b.sisa_pinjaman,
   },
   {
-    title: 'NPL Ratio',
+    title: 'Rasio NPL (>3 Bulan)',
     key: 'npl_ratio',
     width: 120,
     render: (row: any) => {
@@ -270,10 +308,13 @@ async function fetchBranches() {
   try {
     loading.value = true
     const params = new URLSearchParams()
-    if (dateFilter.value) {
-      const date = new Date(dateFilter.value)
-      params.append('date', date.toISOString().split('T')[0])
+
+    const range = getSelectedRange()
+    if (range) {
+      params.append('date_from', range.dateFrom)
+      params.append('date_to', range.dateTo)
     }
+
     params.append('sort_by', sortBy.value)
     params.append('order', sortOrder.value)
     
@@ -289,6 +330,38 @@ async function fetchBranches() {
 
 function refreshData() {
   fetchBranches()
+}
+
+function applyFilter() {
+  fetchBranches()
+}
+
+function toIsoDate(date: Date) {
+  return date.toISOString().split('T')[0]
+}
+
+function getSelectedRange(): { dateFrom: string; dateTo: string } | null {
+  if (filterMode.value === 'date' && selectedDate.value) {
+    const target = new Date(selectedDate.value)
+    const iso = toIsoDate(target)
+    return { dateFrom: iso, dateTo: iso }
+  }
+
+  if (filterMode.value === 'month' && selectedMonth.value) {
+    const target = new Date(selectedMonth.value)
+    const start = new Date(target.getFullYear(), target.getMonth(), 1)
+    const end = new Date(target.getFullYear(), target.getMonth() + 1, 0)
+    return { dateFrom: toIsoDate(start), dateTo: toIsoDate(end) }
+  }
+
+  if (filterMode.value === 'year' && selectedYear.value) {
+    const target = new Date(selectedYear.value)
+    const start = new Date(target.getFullYear(), 0, 1)
+    const end = new Date(target.getFullYear(), 11, 31)
+    return { dateFrom: toIsoDate(start), dateTo: toIsoDate(end) }
+  }
+
+  return null
 }
 
 function showDetail(branch: any) {
@@ -309,7 +382,7 @@ function formatCurrency(value: number) {
   return `Rp ${value.toLocaleString('id-ID')}`
 }
 
-watch([dateFilter, sortBy, sortOrder], () => {
+watch([sortBy, sortOrder], () => {
   fetchBranches()
 })
 

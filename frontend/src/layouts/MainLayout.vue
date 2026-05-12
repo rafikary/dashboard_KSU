@@ -1,6 +1,6 @@
 <template>
-  <div class="min-h-screen transition-colors duration-300" :class="{ 'dark': isDark }">
-    <n-layout has-sider class="min-h-screen" :style="{ background: isDark ? '#111827' : '#f9fafb' }">
+  <div class="min-h-screen transition-colors duration-300 ksu-shell" :class="{ 'dark': isDark }">
+    <n-layout has-sider class="min-h-screen" :style="{ background: isDark ? '#0b1220' : '#eef3fb' }">
       
       <!-- Modern Glassmorphism Sidebar -->
       <n-layout-sider
@@ -12,24 +12,24 @@
         show-trigger
         v-model:collapsed="collapsed"
         :inverted="isDark"
-        class="glass-sidebar"
+        class="sidebar-panel"
         :style="{ 
-          background: isDark ? 'rgba(31, 41, 55, 0.95)' : 'rgba(255, 255, 255, 0.9)',
-          borderRight: isDark ? '1px solid rgba(75, 85, 99, 0.5)' : '1px solid rgba(229, 231, 235, 0.5)'
+          background: isDark ? 'linear-gradient(180deg, #0f1a2b 0%, #0b1320 100%)' : 'linear-gradient(180deg, #f8fbff 0%, #f1f6fe 100%)',
+          borderRight: isDark ? '1px solid rgba(148, 163, 184, 0.15)' : '1px solid rgba(148, 163, 184, 0.28)'
         }"
       >
-        <div class="py-8" :class="collapsed ? 'px-4' : 'px-6'">
+        <div class="py-7" :class="collapsed ? 'px-3' : 'px-5'">
           
           <!-- Logo with gradient -->
-          <div class="flex items-center gap-3 mb-8 transition-all duration-300" :class="{ 'justify-center': collapsed }">
-            <div class="w-12 h-12 rounded-2xl gradient-primary flex items-center justify-center shadow-lg shrink-0" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);">
-              <span class="text-2xl font-bold text-white">QL</span>
+          <div class="brand-block flex items-center gap-3 mb-7 transition-all duration-300" :class="{ 'justify-center': collapsed }">
+            <div class="w-11 h-11 rounded-xl flex items-center justify-center shadow-lg shrink-0 brand-mark">
+              <span class="text-lg font-black text-white tracking-wide">QL</span>
             </div>
-            <div class="flex-1 overflow-hidden whitespace-nowrap" v-show="!collapsed">
-              <h1 class="text-xl font-bold" :class="isDark ? 'text-white' : 'bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent'">
-                KSU Dashboard
+            <div class="flex-1 min-w-0 brand-text" v-show="!collapsed">
+              <h1 class="brand-title" :class="isDark ? 'text-slate-100' : 'text-slate-800'">
+                KSU
               </h1>
-              <p class="text-xs" :class="isDark ? 'text-gray-400' : 'text-gray-500'">Koperasi Simpan Pinjam</p>
+              <p class="brand-subtitle" :class="isDark ? 'text-slate-400' : 'text-slate-500'">KOPERASI SIMPAN PINJAM</p>
             </div>
           </div>
 
@@ -41,7 +41,7 @@
             :collapsed="collapsed"
             :collapsed-width="64"
             :indent="20"
-            class="custom-menu"
+            class="custom-menu menu-surface"
           />
         </div>
       </n-layout-sider>
@@ -50,26 +50,27 @@
       <n-layout :style="{ background: 'transparent' }">
         
         <!-- Modern Header with Glass Effect -->
-        <n-layout-header 
+        <n-layout-header
           bordered 
-          class="glass-header px-8 py-4"
+          class="top-header px-5 md:px-8 py-4 md:py-5"
           :style="{ 
-            background: isDark ? 'rgba(17, 24, 39, 0.8)' : 'rgba(255, 255, 255, 0.8)',
-            borderBottom: isDark ? '1px solid rgba(75, 85, 99, 0.5)' : '1px solid rgba(229, 231, 235, 0.5)',
+            background: isDark ? 'rgba(13, 23, 38, 0.82)' : 'rgba(255, 255, 255, 0.76)',
+            borderBottom: isDark ? '1px solid rgba(148, 163, 184, 0.2)' : '1px solid rgba(148, 163, 184, 0.3)',
             backdropFilter: 'blur(20px)'
           }"
         >
-          <div class="flex items-center justify-between">
-            <div class="flex-1">
-              <h2 class="text-2xl font-bold transition-colors" :class="isDark ? 'text-white' : 'text-gray-800'">{{ pageTitle }}</h2>
-              <p class="text-sm mt-1 transition-colors" :class="isDark ? 'text-gray-400' : 'text-gray-500'">{{ pageDescription }}</p>
+          <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div class="flex-1 min-w-0">
+              <p class="text-[0.72rem] font-semibold uppercase tracking-[0.22em]" :class="isDark ? 'text-sky-300/90' : 'text-sky-700/85'">Ringkasan Kinerja</p>
+              <h2 class="text-[2.1rem] font-black tracking-tight leading-tight transition-colors" :class="isDark ? 'text-slate-100' : 'text-slate-800'">{{ pageTitle }}</h2>
+              <p class="text-sm mt-1 transition-colors" :class="isDark ? 'text-slate-400' : 'text-slate-500'">{{ pageDescription }}</p>
             </div>
             
-            <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2 md:gap-3 flex-wrap md:flex-nowrap">
               <!-- Search -->
               <n-input
                 placeholder="Cari data..."
-                class="w-64 hidden md:flex"
+                class="w-52 lg:w-64 hidden md:flex"
                 round
               >
                 <template #prefix>
@@ -78,7 +79,7 @@
               </n-input>
 
               <!-- Dark Mode Toggle with Animation -->
-              <n-button circle quaternary class="hover-lift dark-mode-toggle" @click="toggleDark()">
+              <n-button circle quaternary class="hover-lift dark-mode-toggle control-btn" @click="toggleDark()">
                 <template #icon>
                   <n-icon 
                     :component="isDark ? SunnyOutline : MoonOutline" 
@@ -93,9 +94,9 @@
 
               <!-- Notifications -->
               <n-badge :value="3" :max="9" dot>
-                <n-button circle quaternary class="hover-lift">
+                <n-button circle quaternary class="hover-lift control-btn">
                   <template #icon>
-                    <n-icon :component="NotificationsOutline" size="20" class="dark:text-gray-300" />
+                    <n-icon :component="NotificationsOutline" size="20" class="dark:text-slate-300" />
                   </template>
                 </n-button>
               </n-badge>
@@ -106,7 +107,7 @@
                   round
                   size="large"
                   class="cursor-pointer hover-lift ml-2"
-                  style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);"
+                  style="background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);"
                 >
                   <span class="text-white font-semibold">A</span>
                 </n-avatar>
@@ -116,7 +117,7 @@
         </n-layout-header>
 
         <!-- Content with beautiful spacing -->
-        <n-layout-content class="p-8 bg-transparent">
+        <n-layout-content class="px-4 md:px-8 py-6 md:py-8 bg-transparent">
           <div class="animate-fade-in">
             <router-view />
           </div>
@@ -187,7 +188,7 @@ const pageTitle = computed(() => {
 const pageDescription = computed(() => {
   const descriptions: Record<string, string> = {
     Dashboard: 'Overview kesehatan keuangan KSU',
-    Branches: 'Monitor performa cabang dan NPL',
+    Branches: 'Monitor performa cabang dan NPL (pinjaman menunggak >3 bulan)',
   }
   return descriptions[activeKey.value] || ''
 })
@@ -231,6 +232,72 @@ function handleUserSelect(key: string) {
 </script>
 
 <style scoped>
+:global(body) {
+  font-family: 'Poppins', 'Segoe UI', sans-serif;
+}
+
+.ksu-shell {
+  background:
+    radial-gradient(800px 360px at -120px -100px, rgba(14, 165, 233, 0.16), transparent 60%),
+    radial-gradient(600px 300px at 105% -60px, rgba(59, 130, 246, 0.14), transparent 58%);
+}
+
+.sidebar-panel {
+  box-shadow: 14px 0 26px rgba(15, 23, 42, 0.08);
+}
+
+.brand-block {
+  padding: 0.72rem 0.78rem;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.brand-text {
+  overflow: visible;
+}
+
+.brand-title {
+  font-size: 1.72rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.012em;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.brand-subtitle {
+  margin-top: 0.34rem;
+  font-size: 0.56rem;
+  letter-spacing: 0.18em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+:global(.dark) .brand-block {
+  background: rgba(30, 41, 59, 0.34);
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+.brand-mark {
+  background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+}
+
+.menu-surface {
+  padding-top: 0.25rem;
+}
+
+.top-header {
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.control-btn {
+  border: 1px solid rgba(148, 163, 184, 0.26);
+}
+
 /* Dark mode toggle animation */
 .dark-mode-toggle {
   position: relative;
@@ -257,21 +324,23 @@ function handleUserSelect(key: string) {
 
 /* Menu Item Styling */
 :deep(.n-menu-item-content) {
-  border-radius: 12px !important;
+  border-radius: 13px !important;
   margin: 4px 8px;
   font-weight: 500;
   transition: all 0.3s ease;
+  min-height: 46px;
 }
 
 :deep(.n-menu-item-content:hover) {
-  transform: translateX(4px);
+  transform: translateX(3px);
+  background: rgba(56, 189, 248, 0.12);
 }
 
 /* Fix Active State Text Color & Background */
 :deep(.n-menu-item-content.n-menu-item-content--selected) {
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
+  background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%) !important;
   font-weight: 600;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.28);
 }
 
 /* Target Header text inside Naive UI Menu */
@@ -284,24 +353,36 @@ function handleUserSelect(key: string) {
   color: white !important;
 }
 
-/* Target Icon inside Naive UI Menu */
-:deep(.n-menu-item-content.n-menu-item-content--selected .n-menu-item-content__icon) {
-  color: white !important;
-}
-
 /* Adjust Naive UI default text colors for dark mode if not using n-config-provider */
 :global(.dark) :deep(.n-menu-item-content-header) {
-  color: #e5e7eb; /* gray-200 */
+  color: #dbeafe;
 }
 
 :global(.dark) :deep(.n-menu-item-content__icon) {
-  color: #9ca3af; /* gray-400 */
+  color: #94a3b8;
 }
 
 .hover-lift {
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .hover-lift:hover {
   transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.14);
+}
+
+@media (max-width: 768px) {
+  .brand-block {
+    padding: 0.62rem 0.68rem;
+    border-radius: 0.85rem;
+  }
+
+  .brand-title {
+    font-size: 1.08rem;
+  }
+
+  .brand-subtitle {
+    font-size: 0.52rem;
+    letter-spacing: 0.12em;
+  }
 }
 </style>

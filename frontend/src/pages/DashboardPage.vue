@@ -1,5 +1,46 @@
 <template>
   <div class="dashboard-container space-y-5">
+    <div class="filter-card">
+      <div class="filter-grid">
+        <n-select
+          v-model:value="filterMode"
+          :options="filterModeOptions"
+          class="filter-input"
+        />
+
+        <n-date-picker
+          v-if="filterMode === 'date'"
+          v-model:value="selectedDate"
+          type="date"
+          clearable
+          placeholder="Pilih tanggal"
+          class="filter-input"
+        />
+
+        <n-date-picker
+          v-else-if="filterMode === 'month'"
+          v-model:value="selectedMonth"
+          type="month"
+          clearable
+          placeholder="Pilih bulan"
+          class="filter-input"
+        />
+
+        <n-date-picker
+          v-else
+          v-model:value="selectedYear"
+          type="year"
+          clearable
+          placeholder="Pilih tahun"
+          class="filter-input"
+        />
+
+        <n-button type="primary" @click="applyFilter">Terapkan</n-button>
+        <n-button quaternary @click="resetFilter">Reset</n-button>
+      </div>
+      <p class="filter-note">Semua KPI dan chart mengikuti filter tanggal, bulan, atau tahun yang dipilih.</p>
+    </div>
+
     <!-- Compact KPI Cards -->
     <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       <n-skeleton height="120px" v-for="i in 4" :key="i" />
@@ -34,7 +75,7 @@
       </div>
       <div class="info-divider"></div>
       <div class="info-item">
-        <span class="info-label">NPL Ratio</span>
+        <span class="info-label">Rasio NPL (Menunggak >3 Bulan)</span>
         <span class="info-value" :class="summary.npl_ratio > 10 ? 'text-red-600' : summary.npl_ratio > 5 ? 'text-orange-600' : 'text-green-600'">
           {{ formatPercent(summary.npl_ratio) }}%
         </span>
@@ -57,7 +98,7 @@
       <div class="chart-card">
         <div class="chart-header">
           <h3 class="chart-title">Trend Pinjaman 6 Bulan Terakhir</h3>
-          <p class="chart-subtitle">Monitoring perkembangan pinjaman dan NPL</p>
+          <p class="chart-subtitle">Monitoring perkembangan pinjaman dan NPL (menunggak >3 bulan)</p>
         </div>
         <div v-if="loadingCharts" class="chart-loading">
           <n-spin size="large" />
@@ -68,8 +109,8 @@
       <!-- NPL Ranking Chart -->
       <div class="chart-card">
         <div class="chart-header">
-          <h3 class="chart-title">Top 10 Cabang NPL Tertinggi</h3>
-          <p class="chart-subtitle">Ranking berdasarkan NPL ratio</p>
+          <h3 class="chart-title">Top 10 Cabang dengan NPL Tertinggi</h3>
+          <p class="chart-subtitle">Pinjaman menunggak lebih dari 3 bulan</p>
         </div>
         <div v-if="loadingCharts" class="chart-loading">
           <n-spin size="large" />
@@ -106,7 +147,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { NIcon, NSkeleton, NSpin } from 'naive-ui'
+import { NIcon, NSkeleton, NSpin, NSelect, NDatePicker, NButton } from 'naive-ui'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { LineChart, BarChart, PieChart } from 'echarts/charts'
@@ -140,6 +181,16 @@ const loadingCharts = ref(true)
 const summary = ref<any>(null)
 const trendData = ref<any[]>([])
 const branchesData = ref<any[]>([])
+const filterMode = ref<'date' | 'month' | 'year'>('date')
+const selectedDate = ref<number | null>(null)
+const selectedMonth = ref<number | null>(null)
+const selectedYear = ref<number | null>(null)
+
+const filterModeOptions = [
+  { label: 'Filter Tanggal', value: 'date' },
+  { label: 'Filter Bulan', value: 'month' },
+  { label: 'Filter Tahun', value: 'year' },
+]
 
 const metrics = ref([
   {
@@ -185,17 +236,38 @@ async function fetchData() {
     loading.value = true
     loadingCharts.value = true
 
-    const summaryRes = await fetch('http://localhost:5000/api/ksu/summary')
+    const range = getSelectedRange()
+    const summaryParams = new URLSearchParams()
+    const trendParams = new URLSearchParams({ granularity: 'month' })
+    const branchParams = new URLSearchParams({ sort_by: 'npl_ratio', order: 'desc' })
+
+    if (range) {
+      summaryParams.append('date_from', range.dateFrom)
+      summaryParams.append('date_to', range.dateTo)
+      trendParams.append('date_from', range.dateFrom)
+      trendParams.append('date_to', range.dateTo)
+      branchParams.append('date_from', range.dateFrom)
+      branchParams.append('date_to', range.dateTo)
+    }
+
+    const summaryUrl = summaryParams.toString()
+      ? `http://localhost:5000/api/ksu/summary?${summaryParams}`
+      : 'http://localhost:5000/api/ksu/summary'
+    const summaryRes = await fetch(summaryUrl)
     const summaryData = await summaryRes.json()
     summary.value = summaryData
 
-    const now = new Date()
-    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1)
-    const trendRes = await fetch(`http://localhost:5000/api/ksu/trend?granularity=month&date_from=${sixMonthsAgo.toISOString().split('T')[0]}`)
+    if (!range) {
+      const now = new Date()
+      const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1)
+      trendParams.append('date_from', toIsoDate(sixMonthsAgo))
+    }
+
+    const trendRes = await fetch(`http://localhost:5000/api/ksu/trend?${trendParams}`)
     const trendResult = await trendRes.json()
     trendData.value = trendResult.data || []
 
-    const branchesRes = await fetch('http://localhost:5000/api/ksu/branches?sort_by=npl_ratio&order=desc')
+    const branchesRes = await fetch(`http://localhost:5000/api/ksu/branches?${branchParams}`)
     const branchesResult = await branchesRes.json()
     branchesData.value = branchesResult.branches || []
 
@@ -206,7 +278,7 @@ async function fetchData() {
     metrics.value[1].subtitle = `${summaryData.collection_rate.toFixed(1)}% terkumpul`
 
     metrics.value[2].value = summaryData.total_jasa_tertunggak
-    metrics.value[2].subtitle = `NPL: Rp ${(summaryData.total_sisa_pinjaman_np / 1e9).toFixed(1)}M`
+    metrics.value[2].subtitle = `NPL (>3 Bulan): Rp ${(summaryData.total_sisa_pinjaman_np / 1e9).toFixed(1)}M`
 
     metrics.value[3].value = summaryData.total_saldo_kas + summaryData.total_saldo_bank
     metrics.value[3].subtitle = `Bank: Rp ${(summaryData.total_saldo_bank / 1e9).toFixed(1)}M`
@@ -219,6 +291,46 @@ async function fetchData() {
   }
 }
 
+function applyFilter() {
+  fetchData()
+}
+
+function resetFilter() {
+  selectedDate.value = null
+  selectedMonth.value = null
+  selectedYear.value = null
+  filterMode.value = 'date'
+  fetchData()
+}
+
+function toIsoDate(date: Date) {
+  return date.toISOString().split('T')[0]
+}
+
+function getSelectedRange(): { dateFrom: string; dateTo: string } | null {
+  if (filterMode.value === 'date' && selectedDate.value) {
+    const target = new Date(selectedDate.value)
+    const iso = toIsoDate(target)
+    return { dateFrom: iso, dateTo: iso }
+  }
+
+  if (filterMode.value === 'month' && selectedMonth.value) {
+    const target = new Date(selectedMonth.value)
+    const start = new Date(target.getFullYear(), target.getMonth(), 1)
+    const end = new Date(target.getFullYear(), target.getMonth() + 1, 0)
+    return { dateFrom: toIsoDate(start), dateTo: toIsoDate(end) }
+  }
+
+  if (filterMode.value === 'year' && selectedYear.value) {
+    const target = new Date(selectedYear.value)
+    const start = new Date(target.getFullYear(), 0, 1)
+    const end = new Date(target.getFullYear(), 11, 31)
+    return { dateFrom: toIsoDate(start), dateTo: toIsoDate(end) }
+  }
+
+  return null
+}
+
 const trendChartOption = computed(() => ({
   tooltip: {
     trigger: 'axis',
@@ -228,7 +340,7 @@ const trendChartOption = computed(() => ({
     textStyle: { color: '#374151', fontSize: 12 },
   },
   legend: {
-    data: ['Sisa Pinjaman', 'NPL Ratio'],
+    data: ['Sisa Pinjaman', 'Rasio NPL (>3 Bulan)'],
     bottom: 0,
     textStyle: { fontSize: 11, color: '#6b7280' }
   },
@@ -256,7 +368,7 @@ const trendChartOption = computed(() => ({
     },
     {
       type: 'value',
-      name: 'NPL %',
+      name: 'Rasio NPL (>3 Bulan) %',
       nameTextStyle: { fontSize: 11, color: '#6b7280' },
       axisLabel: { fontSize: 11, color: '#6b7280', formatter: '{value}%' },
       splitLine: { show: false }
@@ -284,7 +396,7 @@ const trendChartOption = computed(() => ({
       }
     },
     {
-      name: 'NPL Ratio',
+      name: 'Rasio NPL (>3 Bulan)',
       type: 'line',
       yAxisIndex: 1,
       data: trendData.value.map(d => d.npl_ratio),
@@ -456,6 +568,30 @@ function formatPercent(value: number) {
   margin: 0 auto;
 }
 
+.filter-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  align-items: center;
+}
+
+.filter-input {
+  width: 100%;
+}
+
+.filter-note {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
 .kpi-card {
   background: white;
   border: 1px solid #e5e7eb;
@@ -580,6 +716,18 @@ function formatPercent(value: number) {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@media (max-width: 992px) {
+  .filter-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .filter-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>
