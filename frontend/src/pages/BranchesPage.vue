@@ -60,11 +60,17 @@
     </div>
 
     <!-- Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
       <div class="glass-card rounded-2xl p-6">
-        <div class="text-sm text-gray-500 dark:text-gray-400">Total Cabang</div>
+        <div class="text-sm text-gray-500 dark:text-gray-400">Cabang Aktif</div>
         <div class="text-2xl font-bold text-gray-900 dark:text-white mt-2">
-          {{ branches.length }}
+          {{ branchSummary.total_cabang_aktif }}
+        </div>
+      </div>
+      <div class="glass-card rounded-2xl p-6 border border-amber-200 bg-amber-50/40">
+        <div class="text-sm text-amber-700">Cabang Nonaktif</div>
+        <div class="text-2xl font-bold text-amber-700 mt-2">
+          {{ branchSummary.total_cabang_nonaktif }}
         </div>
       </div>
       <div class="glass-card rounded-2xl p-6">
@@ -113,7 +119,17 @@
           </div>
           <div>
             <div class="text-sm text-gray-500">Flag (Jenis)</div>
-            <div class="font-bold">{{ selectedBranch.flag }} <span class="text-xs text-gray-400">({{ selectedBranch.flag === 'A' ? 'Pajak' : 'Non Pajak' }})</span></div>
+            <div class="font-bold">
+              {{ selectedBranch.flag }}
+              <span class="text-xs text-gray-400">({{ selectedBranch.flag === 'A+B' ? 'Pajak + Non Pajak' : selectedBranch.flag === 'A' ? 'Pajak' : 'Non Pajak' }})</span>
+            </div>
+          </div>
+          <div>
+            <div class="text-sm text-gray-500">Status Cabang</div>
+            <div :class="selectedBranch.is_nonaktif ? 'font-bold text-amber-600' : 'font-bold text-emerald-600'">
+              {{ selectedBranch.is_nonaktif ? 'Nonaktif' : 'Aktif' }}
+              <span v-if="selectedBranch.is_nonaktif && selectedBranch.nonaktif_reason" class="text-xs text-amber-500">({{ selectedBranch.nonaktif_reason }})</span>
+            </div>
           </div>
           <div>
             <div class="text-sm text-gray-500">Total Pinjaman</div>
@@ -177,6 +193,14 @@ import type { DataTableColumns } from 'naive-ui'
 
 const loading = ref(true)
 const branches = ref<any[]>([])
+const branchSummary = ref({
+  total_cabang_all: 0,
+  total_cabang_aktif: 0,
+  total_cabang_nonaktif: 0,
+  total_sisa_pinjaman_aktif: 0,
+  avg_npl_aktif: 0,
+  avg_collection_rate_aktif: 0,
+})
 const filterMode = ref<'date' | 'month' | 'year'>('date')
 const selectedDate = ref<number | null>(null)
 const selectedMonth = ref<number | null>(null)
@@ -221,6 +245,16 @@ const columns: DataTableColumns = [
     key: 'nama',
     width: 200,
     fixed: 'left',
+  },
+  {
+    title: 'Status',
+    key: 'status',
+    width: 140,
+    render: (row: any) => h(
+      NTag,
+      { type: row.is_nonaktif ? 'warning' : 'success' },
+      { default: () => row.is_nonaktif ? 'Nonaktif' : 'Aktif' }
+    ),
   },
   {
     title: 'Sisa Pinjaman',
@@ -283,19 +317,15 @@ const columns: DataTableColumns = [
 ]
 
 const totalPinjaman = computed(() => {
-  return branches.value.reduce((sum, b) => sum + b.sisa_pinjaman, 0)
+  return branchSummary.value.total_sisa_pinjaman_aktif
 })
 
 const avgNPL = computed(() => {
-  if (branches.value.length === 0) return 0
-  const sum = branches.value.reduce((s, b) => s + b.npl_ratio, 0)
-  return sum / branches.value.length
+  return branchSummary.value.avg_npl_aktif || 0
 })
 
 const avgCollectionRate = computed(() => {
-  if (branches.value.length === 0) return 0
-  const sum = branches.value.reduce((s, b) => s + b.collection_rate, 0)
-  return sum / branches.value.length
+  return branchSummary.value.avg_collection_rate_aktif || 0
 })
 
 const nplColor = computed(() => {
@@ -321,6 +351,7 @@ async function fetchBranches() {
     const response = await fetch(`http://localhost:5000/api/ksu/branches?${params}`)
     const data = await response.json()
     branches.value = data.branches || []
+    branchSummary.value = data.summary || branchSummary.value
   } catch (error) {
     console.error('Error fetching branches:', error)
   } finally {
@@ -337,7 +368,10 @@ function applyFilter() {
 }
 
 function toIsoDate(date: Date) {
-  return date.toISOString().split('T')[0]
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function getSelectedRange(): { dateFrom: string; dateTo: string } | null {
@@ -370,6 +404,7 @@ function showDetail(branch: any) {
 }
 
 function rowClassName(row: any) {
+  if (row.is_nonaktif) return 'branch-inactive'
   if (row.npl_ratio > 10) return 'npl-high'
   if (row.npl_ratio > 5) return 'npl-medium'
   return ''
@@ -398,5 +433,9 @@ onMounted(() => {
 
 :deep(.npl-medium) {
   background-color: rgba(251, 146, 60, 0.1);
+}
+
+:deep(.branch-inactive) {
+  background-color: rgba(245, 158, 11, 0.12);
 }
 </style>

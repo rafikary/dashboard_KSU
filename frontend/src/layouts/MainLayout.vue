@@ -1,53 +1,113 @@
 <template>
   <div class="min-h-screen transition-colors duration-300 ksu-shell" :class="{ 'dark': isDark }">
-    <n-layout has-sider class="min-h-screen" :style="{ background: isDark ? '#0b1220' : '#eef3fb' }">
+    <n-layout :has-sider="!isMobile" class="min-h-screen app-frame" :style="{ background: isDark ? '#0b1220' : '#eef3fb' }">
       
       <!-- Modern Glassmorphism Sidebar -->
       <n-layout-sider
+        v-if="!isMobile"
         bordered
         collapse-mode="width"
-        :collapsed-width="80"
+        :collapsed-width="76"
         :width="280"
         :native-scrollbar="false"
-        show-trigger
         v-model:collapsed="collapsed"
         :inverted="isDark"
-        class="sidebar-panel"
+        class="sidebar-panel fixed-sidebar"
         :style="{ 
           background: isDark ? 'linear-gradient(180deg, #0f1a2b 0%, #0b1320 100%)' : 'linear-gradient(180deg, #f8fbff 0%, #f1f6fe 100%)',
           borderRight: isDark ? '1px solid rgba(148, 163, 184, 0.15)' : '1px solid rgba(148, 163, 184, 0.28)'
         }"
       >
-        <div class="py-7" :class="collapsed ? 'px-3' : 'px-5'">
-          
-          <!-- Logo with gradient -->
-          <div class="brand-block flex items-center gap-3 mb-7 transition-all duration-300" :class="{ 'justify-center': collapsed }">
-            <div class="w-11 h-11 rounded-xl flex items-center justify-center shadow-lg shrink-0 brand-mark">
-              <span class="text-lg font-black text-white tracking-wide">QL</span>
+        <div class="relative h-full flex flex-col">
+          <!-- Sidebar Content -->
+          <div class="flex-1 py-7 overflow-y-auto overflow-x-hidden" :class="collapsed ? 'px-2' : 'px-5'">
+            
+            <!-- Logo with gradient -->
+            <div class="brand-block flex items-center gap-3 mb-7 transition-all duration-300" :class="{ 'justify-center': collapsed }">
+              <div class="w-11 h-11 rounded-xl flex items-center justify-center shadow-lg shrink-0 brand-mark">
+                <span class="text-lg font-black text-white tracking-wide">QL</span>
+              </div>
+              <div class="flex-1 min-w-0 brand-text" v-show="!collapsed">
+                <h1 class="brand-title" :class="isDark ? 'text-slate-100' : 'text-slate-800'">
+                  KSU
+                </h1>
+                <p class="brand-subtitle" :class="isDark ? 'text-slate-400' : 'text-slate-500'">KOPERASI SIMPAN PINJAM</p>
+              </div>
             </div>
-            <div class="flex-1 min-w-0 brand-text" v-show="!collapsed">
-              <h1 class="brand-title" :class="isDark ? 'text-slate-100' : 'text-slate-800'">
-                KSU
-              </h1>
-              <p class="brand-subtitle" :class="isDark ? 'text-slate-400' : 'text-slate-500'">KOPERASI SIMPAN PINJAM</p>
-            </div>
+
+            <!-- Modern Navigation Menu -->
+            <n-menu
+              :value="activeKey"
+              :options="menuOptions"
+              @update:value="handleMenuClick"
+              :collapsed="collapsed"
+              :collapsed-width="76"
+              :indent="collapsed ? 0 : 20"
+              class="custom-menu menu-surface w-full"
+              :class="{ 'menu-collapsed': collapsed }"
+            />
           </div>
 
-          <!-- Modern Navigation Menu -->
-          <n-menu
-            :value="activeKey"
-            :options="menuOptions"
-            @update:value="handleMenuClick"
-            :collapsed="collapsed"
-            :collapsed-width="64"
-            :indent="20"
-            class="custom-menu menu-surface"
-          />
+          <!-- Custom Collapse Toggle Button -->
+          <!-- <div class="collapse-trigger-container" :class="collapsed ? 'px-2' : 'px-5'">
+            <n-button
+              quaternary
+              class="collapse-btn w-full"
+              @click="collapsed = !collapsed"
+              :title="collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'"
+            >
+              <template #icon>
+                <n-icon
+                  :component="collapsed ? MenuOutline : CloseOutline"
+                  :class="['transition-transform duration-300', { 'rotate-0': !collapsed, 'rotate-180': collapsed }]"
+                />
+              </template>
+              <span v-if="!collapsed" class="ml-2 text-sm font-medium">
+                {{ collapsed ? 'Expand' : 'Collapse' }}
+              </span>
+            </n-button>
+          </div> -->
         </div>
       </n-layout-sider>
 
+      <n-drawer
+        v-model:show="mobileMenuOpen"
+        placement="left"
+        :width="284"
+        :trap-focus="true"
+        :auto-focus="false"
+        :show-mask="true"
+      >
+        <n-drawer-content body-content-style="padding: 0;">
+          <div
+            class="h-full overflow-y-auto overflow-x-hidden px-5 py-7"
+            :style="{
+              background: isDark ? 'linear-gradient(180deg, #0f1a2b 0%, #0b1320 100%)' : 'linear-gradient(180deg, #f8fbff 0%, #f1f6fe 100%)'
+            }"
+          >
+            <div class="brand-block flex items-center gap-3 mb-7 transition-all duration-300">
+              <div class="w-11 h-11 rounded-xl flex items-center justify-center shadow-lg shrink-0 brand-mark">
+                <span class="text-lg font-black text-white tracking-wide">QL</span>
+              </div>
+              <div class="flex-1 min-w-0 brand-text">
+                <h1 class="brand-title" :class="isDark ? 'text-slate-100' : 'text-slate-800'">KSU</h1>
+                <p class="brand-subtitle" :class="isDark ? 'text-slate-400' : 'text-slate-500'">KOPERASI SIMPAN PINJAM</p>
+              </div>
+            </div>
+
+            <n-menu
+              :value="activeKey"
+              :options="menuOptions"
+              @update:value="handleMenuClick"
+              :indent="20"
+              class="menu-surface w-full"
+            />
+          </div>
+        </n-drawer-content>
+      </n-drawer>
+
       <!-- Main Content Area -->
-      <n-layout :style="{ background: 'transparent' }">
+      <n-layout :style="{ background: 'transparent' }" class="main-panel">
         
         <!-- Modern Header with Glass Effect -->
         <n-layout-header
@@ -61,9 +121,25 @@
         >
           <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div class="flex-1 min-w-0">
-              <p class="text-[0.72rem] font-semibold uppercase tracking-[0.22em]" :class="isDark ? 'text-sky-300/90' : 'text-sky-700/85'">Ringkasan Kinerja</p>
-              <h2 class="text-[2.1rem] font-black tracking-tight leading-tight transition-colors" :class="isDark ? 'text-slate-100' : 'text-slate-800'">{{ pageTitle }}</h2>
+              <div class="flex items-start gap-3">
+                <n-button
+                  v-if="isMobile"
+                  circle
+                  quaternary
+                  class="control-btn mt-1"
+                  @click="mobileMenuOpen = true"
+                >
+                  <template #icon>
+                    <n-icon :component="MenuOutline" size="20" />
+                  </template>
+                </n-button>
+
+                <div class="min-w-0">
+              <p class="text-[0.66rem] md:text-[0.72rem] font-semibold uppercase tracking-[0.18em] md:tracking-[0.22em]" :class="isDark ? 'text-sky-300/90' : 'text-sky-700/85'">Ringkasan Kinerja</p>
+              <h2 class="text-[1.45rem] md:text-[2.1rem] font-black tracking-tight leading-tight transition-colors" :class="isDark ? 'text-slate-100' : 'text-slate-800'">{{ pageTitle }}</h2>
               <p class="text-sm mt-1 transition-colors" :class="isDark ? 'text-slate-400' : 'text-slate-500'">{{ pageDescription }}</p>
+                </div>
+              </div>
             </div>
             
             <div class="flex items-center gap-2 md:gap-3 flex-wrap md:flex-nowrap">
@@ -117,7 +193,7 @@
         </n-layout-header>
 
         <!-- Content with beautiful spacing -->
-        <n-layout-content class="px-4 md:px-8 py-6 md:py-8 bg-transparent">
+        <n-layout-content class="px-4 md:px-8 py-6 md:py-8 bg-transparent content-scroll">
           <div class="animate-fade-in">
             <router-view />
           </div>
@@ -128,14 +204,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, h } from 'vue'
+import { ref, computed, h, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { useDark, useToggle } from '@vueuse/core'
+import { breakpointsTailwind, useBreakpoints, useDark, useToggle } from '@vueuse/core'
 import {
   NLayout,
   NLayoutSider,
   NLayoutHeader,
   NLayoutContent,
+  NDrawer,
+  NDrawerContent,
   NMenu,
   NInput,
   NButton,
@@ -164,13 +242,18 @@ import {
   LogOutOutline,
   MoonOutline,
   SunnyOutline,
+  MenuOutline,
+  CloseOutline,
   BusinessOutline
 } from '@vicons/ionicons5'
 
 // State for Sidebar & Dark Mode
 const collapsed = ref(false)
+const mobileMenuOpen = ref(false)
 const isDark = useDark()
 const toggleDark = useToggle(isDark)
+const breakpoints = useBreakpoints(breakpointsTailwind)
+const isMobile = breakpoints.smaller('md')
 
 const router = useRouter()
 const route = useRoute()
@@ -194,12 +277,17 @@ const pageDescription = computed(() => {
 })
 
 function renderIcon(icon: any) {
-  return () => h(NIcon, null, { default: () => h(icon) })
+  return () =>
+    h(
+      'span',
+      { class: 'menu-icon-wrap inline-flex items-center justify-center w-5 h-5' },
+      [h(NIcon, { size: 20 }, { default: () => h(icon) })]
+    )
 }
 
 const menuOptions: MenuOption[] = [
-  { label: 'Dashboard', key: 'Dashboard', icon: renderIcon(HomeOutline) },
-  { label: 'Data Cabang', key: 'Branches', icon: renderIcon(BusinessOutline) },
+  { label: 'Dashboard', key: 'Dashboard', icon: renderIcon(HomeOutline), show: true },
+  { label: 'Data Cabang', key: 'Branches', icon: renderIcon(BusinessOutline), show: true },
   // Disabled menu items (not relevant for KSU):
   // { label: 'Analisa Penjualan', key: 'sales', icon: renderIcon(TrendingUpOutline) },
   // { label: 'Perbandingan', key: 'Comparison', icon: renderIcon(SwapHorizontalOutline) },
@@ -222,6 +310,9 @@ const userOptions = [
 
 function handleMenuClick(key: string) {
   router.push({ name: key })
+  if (isMobile.value) {
+    mobileMenuOpen.value = false
+  }
 }
 
 function handleUserSelect(key: string) {
@@ -229,6 +320,19 @@ function handleUserSelect(key: string) {
     console.log('Logout')
   }
 }
+
+watch(
+  () => route.fullPath,
+  () => {
+    mobileMenuOpen.value = false
+  }
+)
+
+watch(isMobile, (mobile) => {
+  if (!mobile) {
+    mobileMenuOpen.value = false
+  }
+})
 </script>
 
 <style scoped>
@@ -242,8 +346,44 @@ function handleUserSelect(key: string) {
     radial-gradient(600px 300px at 105% -60px, rgba(59, 130, 246, 0.14), transparent 58%);
 }
 
+.app-frame {
+  height: 100vh;
+  overflow: hidden;
+}
+
 .sidebar-panel {
   box-shadow: 14px 0 26px rgba(15, 23, 42, 0.08);
+}
+
+.fixed-sidebar {
+  height: 100vh;
+  position: sticky;
+  top: 0;
+}
+
+.main-panel {
+  height: 100vh;
+  overflow: hidden;
+}
+
+:deep(.main-panel > .n-layout-scroll-container) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.content-scroll {
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+
+:deep(.content-scroll > .n-layout-scroll-container) {
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .brand-block {
@@ -287,7 +427,34 @@ function handleUserSelect(key: string) {
 }
 
 .menu-surface {
-  padding-top: 0.25rem;
+  padding-top: 0.45rem;
+}
+
+/* Custom Collapse Button */
+.collapse-trigger-container {
+  padding-top: 0.75rem;
+  padding-bottom: 1rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+:global(.dark) .collapse-trigger-container {
+  border-top-color: rgba(148, 163, 184, 0.08);
+}
+
+.collapse-btn {
+  border-radius: 10px;
+  transition: all 0.3s ease;
+  padding: 0.65rem 1rem;
+  font-weight: 500;
+}
+
+.collapse-btn:hover {
+  background: rgba(56, 189, 248, 0.1);
+  transform: translateY(-1px);
+}
+
+:global(.dark) .collapse-btn:hover {
+  background: rgba(56, 189, 248, 0.08);
 }
 
 .top-header {
@@ -334,6 +501,59 @@ function handleUserSelect(key: string) {
 :deep(.n-menu-item-content:hover) {
   transform: translateX(3px);
   background: rgba(56, 189, 248, 0.12);
+}
+
+:deep(.menu-collapsed.n-menu) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+:deep(.menu-collapsed .n-menu-item) {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding-left: 0.25rem !important;
+  padding-right: 0.25rem !important;
+}
+
+:deep(.menu-collapsed .n-menu-item-content) {
+  width: 100%;
+  height: 3rem;
+  min-height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 3rem;
+  margin: 0.5rem auto !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+:deep(.menu-collapsed .n-menu-item-content:hover) {
+  transform: none;
+}
+
+:deep(.menu-collapsed .n-menu-item-content__icon) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: auto;
+  margin-right: 0 !important;
+  margin-left: 0 !important;
+}
+
+:deep(.menu-collapsed .n-menu-item-content__icon .n-icon) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+:deep(.menu-collapsed .n-menu-item-content.n-menu-item-content--selected) {
+  width: 100%;
+  max-width: 3rem;
 }
 
 /* Fix Active State Text Color & Background */

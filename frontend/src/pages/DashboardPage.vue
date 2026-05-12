@@ -70,8 +70,13 @@
     <!-- Summary Info Bar -->
     <div class="info-bar" v-if="summary">
       <div class="info-item">
-        <span class="info-label">Total Cabang</span>
-        <span class="info-value">{{ summary.jumlah_cabang }} Cabang</span>
+        <span class="info-label">Cabang Aktif</span>
+        <span class="info-value">{{ summary.jumlah_cabang_aktif || summary.jumlah_cabang }} Cabang</span>
+      </div>
+      <div class="info-divider"></div>
+      <div class="info-item">
+        <span class="info-label">Cabang Nonaktif</span>
+        <span class="info-value text-yellow-300">{{ summary.jumlah_cabang_nonaktif || 0 }} Cabang</span>
       </div>
       <div class="info-divider"></div>
       <div class="info-item">
@@ -238,8 +243,8 @@ async function fetchData() {
 
     const range = getSelectedRange()
     const summaryParams = new URLSearchParams()
-    const trendParams = new URLSearchParams({ granularity: 'month' })
-    const branchParams = new URLSearchParams({ sort_by: 'npl_ratio', order: 'desc' })
+    const trendParams = new URLSearchParams({ granularity: 'month', include_nonaktif: 'false' })
+    const branchParams = new URLSearchParams({ sort_by: 'npl_ratio', order: 'desc', include_nonaktif: 'false' })
 
     if (range) {
       summaryParams.append('date_from', range.dateFrom)
@@ -272,7 +277,7 @@ async function fetchData() {
     branchesData.value = branchesResult.branches || []
 
     metrics.value[0].value = summaryData.total_pinjaman
-    metrics.value[0].subtitle = `${summaryData.jumlah_cabang} Cabang`
+    metrics.value[0].subtitle = `${summaryData.jumlah_cabang_aktif || summaryData.jumlah_cabang} Cabang Aktif`
 
     metrics.value[1].value = summaryData.total_sisa_pinjaman
     metrics.value[1].subtitle = `${summaryData.collection_rate.toFixed(1)}% terkumpul`
@@ -304,7 +309,10 @@ function resetFilter() {
 }
 
 function toIsoDate(date: Date) {
-  return date.toISOString().split('T')[0]
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function getSelectedRange(): { dateFrom: string; dateTo: string } | null {

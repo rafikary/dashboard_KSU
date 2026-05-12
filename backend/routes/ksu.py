@@ -1,7 +1,5 @@
 from flask import Blueprint, request, current_app, jsonify
 import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
 
 ksu_bp = Blueprint('ksu', __name__)
 
@@ -12,6 +10,76 @@ def get_ksu_df():
     if df is None or df.empty:
         return pd.DataFrame()
     return df.copy()
+
+
+NUMERIC_COLS = [
+    'pinjaman',
+    'sisapinjaman',
+    'jasattg1',
+    'jasattg2',
+    'jasattg3',
+    'jasattgnp',
+    'totaljasattg',
+    'sisapinjamannp',
+    'saldokas',
+    'saldobank',
+]
+
+
+def parse_day_start(date_str: str) -> pd.Timestamp:
+    return pd.to_datetime(date_str).normalize()
+
+
+def parse_day_end(date_str: str) -> pd.Timestamp:
+    return parse_day_start(date_str) + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
+
+
+def latest_branch_snapshot(df: pd.DataFrame) -> pd.DataFrame:
+    """Build latest branch snapshot by aggregating A/B flag rows into one row per kode."""
+    latest_by_kode_flag = (
+        df.sort_values('tglnominatif')
+        .groupby(['kode', 'flag'], as_index=False)
+        .last()
+    )
+
+    agg_map = {col: 'sum' for col in NUMERIC_COLS}
+    agg_map.update({'nama': 'first', 'tglnominatif': 'max'})
+
+    branch_df = latest_by_kode_flag.groupby('kode', as_index=False).agg(agg_map)
+    branch_df['flag'] = 'A+B'
+    return branch_df
+
+
+def aggregate_branch_history(df_branch: pd.DataFrame) -> pd.DataFrame:
+    """Aggregate daily A/B rows into one daily row per branch."""
+    agg_map = {col: 'sum' for col in NUMERIC_COLS}
+    agg_map.update({'nama': 'first', 'kode': 'first'})
+    daily = df_branch.groupby('tglnominatif', as_index=False).agg(agg_map)
+    daily['flag'] = 'A+B'
+    return daily.sort_values('tglnominatif')
+
+
+def annotate_branch_status(branch_df: pd.DataFrame, reference_date: pd.Timestamp) -> pd.DataFrame:
+    """Mark branch as nonactive when no update >= 7 days or NPL is 100%."""
+    df = branch_df.copy()
+    ref_date = reference_date.normalize()
+    df['days_since_update'] = (ref_date - df['tglnominatif'].dt.normalize()).dt.days.clip(lower=0)
+
+    stale_mask = df['days_since_update'] >= 7
+    npl_100_mask = df['npl_ratio'] >= 99.999
+
+    df['is_nonaktif'] = stale_mask | npl_100_mask
+
+    def _reason(row):
+        reasons = []
+        if row['days_since_update'] >= 7:
+            reasons.append(f"tidak ada update {int(row['days_since_update'])} hari")
+        if row['npl_ratio'] >= 99.999:
+            reasons.append("NPL 100%")
+        return '; '.join(reasons) if reasons else ''
+
+    df['nonaktif_reason'] = df.apply(_reason, axis=1)
+    return df
 
 
 @ksu_bp.route('/api/ksu/summary')
@@ -34,24 +102,33 @@ def ksu_summary():
     branch_code = request.args.get('branch_code')
     
     if date_from:
-        df = df[df['tglnominatif'] >= pd.to_datetime(date_from)]
+        df = df[df['tglnominatif'] >= parse_day_start(date_from)]
     if date_to:
-        df = df[df['tglnominatif'] <= pd.to_datetime(date_to)]
+        df = df[df['tglnominatif'] <= parse_day_end(date_to)]
     if branch_code:
         df = df[df['kode'].str.upper() == branch_code.upper()]
+
+    if df.empty:
+        return jsonify({'error': 'No data available'}), 404
     
-    # Get latest data for each branch
-    latest_df = df.sort_values('tglnominatif').groupby('kode').last().reset_index()
+    latest_df = latest_branch_snapshot(df)
+
+    reference_date = parse_day_end(date_to) if date_to else df['tglnominatif'].max()
+    latest_df['npl_ratio'] = (latest_df['sisapinjamannp'] / latest_df['sisapinjaman'] * 100).fillna(0)
+    latest_df = annotate_branch_status(latest_df, reference_date)
+
+    active_df = latest_df[~latest_df['is_nonaktif']].copy()
+    metrics_df = active_df
     
     # Calculate summary
-    total_pinjaman = latest_df['pinjaman'].sum()
-    total_sisa_pinjaman = latest_df['sisapinjaman'].sum()
-    total_jasa_ttg = latest_df['totaljasattg'].sum()
-    total_jasa_ttg_1 = latest_df['jasattg1'].sum()
-    total_jasa_ttg_2 = latest_df['jasattg2'].sum()
-    total_jasa_ttg_3 = latest_df['jasattg3'].sum()
-    total_jasa_ttg_np = latest_df['jasattgnp'].sum()
-    total_sisa_pinjaman_np = latest_df['sisapinjamannp'].sum()
+    total_pinjaman = metrics_df['pinjaman'].sum()
+    total_sisa_pinjaman = metrics_df['sisapinjaman'].sum()
+    total_jasa_ttg = metrics_df['totaljasattg'].sum()
+    total_jasa_ttg_1 = metrics_df['jasattg1'].sum()
+    total_jasa_ttg_2 = metrics_df['jasattg2'].sum()
+    total_jasa_ttg_3 = metrics_df['jasattg3'].sum()
+    total_jasa_ttg_np = metrics_df['jasattgnp'].sum()
+    total_sisa_pinjaman_np = metrics_df['sisapinjamannp'].sum()
     
     summary = {
         'total_pinjaman': float(total_pinjaman),
@@ -65,9 +142,11 @@ def ksu_summary():
         'total_sisa_pinjaman_np': float(total_sisa_pinjaman_np),
         'npl_ratio': float((total_sisa_pinjaman_np / total_sisa_pinjaman * 100) if total_sisa_pinjaman > 0 else 0),
         'npl_amount_ratio': float((total_sisa_pinjaman_np / total_pinjaman * 100) if total_pinjaman > 0 else 0),
-        'total_saldo_kas': float(latest_df['saldokas'].sum()),
-        'total_saldo_bank': float(latest_df['saldobank'].sum()),
-        'jumlah_cabang': int(latest_df['kode'].nunique()),
+        'total_saldo_kas': float(metrics_df['saldokas'].sum()),
+        'total_saldo_bank': float(metrics_df['saldobank'].sum()),
+        'jumlah_cabang': int(metrics_df['kode'].nunique()),
+        'jumlah_cabang_aktif': int(active_df['kode'].nunique()),
+        'jumlah_cabang_nonaktif': int(latest_df['is_nonaktif'].sum()),
         'collection_rate': float(((total_pinjaman - total_sisa_pinjaman) / total_pinjaman * 100) if total_pinjaman > 0 else 0),
         'latest_date': df['tglnominatif'].max().strftime('%Y-%m-%d') if not df.empty else None
     }
@@ -83,6 +162,7 @@ def list_branches():
     - date: specific date (YYYY-MM-DD), default to latest
     - date_from: start date (YYYY-MM-DD)
     - date_to: end date (YYYY-MM-DD)
+    - include_nonaktif: true/false (default: true)
     - sort_by: field to sort by (default: sisapinjaman)
     - order: asc or desc (default: desc)
     """
@@ -95,25 +175,25 @@ def list_branches():
     date_param = request.args.get('date')
     date_from = request.args.get('date_from')
     date_to = request.args.get('date_to')
+    include_nonaktif = request.args.get('include_nonaktif', 'true').lower() != 'false'
 
     if date_from:
-        df = df[df['tglnominatif'] >= pd.to_datetime(date_from)]
+        df = df[df['tglnominatif'] >= parse_day_start(date_from)]
     if date_to:
-        df = df[df['tglnominatif'] <= pd.to_datetime(date_to)]
+        df = df[df['tglnominatif'] <= parse_day_end(date_to)]
 
     if df.empty:
         return jsonify({'branches': [], 'total': 0}), 200
 
     if date_param:
-        target_date = pd.to_datetime(date_param)
+        target_date = parse_day_end(date_param)
         # Get closest date per branch
         df_filtered = df[df['tglnominatif'] <= target_date]
         if df_filtered.empty:
             return jsonify({'branches': [], 'total': 0}), 200
-        df_latest = df_filtered.sort_values('tglnominatif').groupby('kode').last().reset_index()
+        df_latest = latest_branch_snapshot(df_filtered)
     else:
-        # Get latest data for each branch
-        df_latest = df.sort_values('tglnominatif').groupby('kode').last().reset_index()
+        df_latest = latest_branch_snapshot(df)
     
     # Calculate additional metrics
     df_latest['npl_ratio'] = (df_latest['sisapinjamannp'] / df_latest['sisapinjaman'] * 100).fillna(0)
@@ -121,6 +201,15 @@ def list_branches():
     df_latest['collection_rate'] = ((df_latest['pinjaman'] - df_latest['sisapinjaman']) / df_latest['pinjaman'] * 100).fillna(0)
     df_latest['total_liquidity'] = df_latest['saldokas'] + df_latest['saldobank']
     df_latest['jasa_ttg_ratio'] = (df_latest['totaljasattg'] / df_latest['sisapinjaman'] * 100).fillna(0)
+
+    reference_date = parse_day_end(date_to) if date_to else (parse_day_end(date_param) if date_param else df['tglnominatif'].max())
+    df_latest = annotate_branch_status(df_latest, reference_date)
+
+    active_df = df_latest[~df_latest['is_nonaktif']].copy()
+    metrics_df = active_df
+
+    if not include_nonaktif:
+        df_latest = active_df
     
     # Sort
     sort_by = request.args.get('sort_by', 'sisapinjaman')
@@ -161,12 +250,23 @@ def list_branches():
             'saldo_bank': float(row['saldobank']),
             'collection_rate': float(row['collection_rate']),
             'total_liquidity': float(row['total_liquidity']),
-            'tanggal': row['tglnominatif'].strftime('%Y-%m-%d')
+            'tanggal': row['tglnominatif'].strftime('%Y-%m-%d'),
+            'is_nonaktif': bool(row['is_nonaktif']),
+            'nonaktif_reason': row['nonaktif_reason'],
+            'days_since_update': int(row['days_since_update'])
         })
     
     return jsonify({
         'branches': branches,
-        'total': len(branches)
+        'total': len(branches),
+        'summary': {
+            'total_cabang_all': int(df_latest['kode'].nunique() if include_nonaktif else metrics_df['kode'].nunique()),
+            'total_cabang_aktif': int(active_df['kode'].nunique()),
+            'total_cabang_nonaktif': int(metrics_df.shape[0] - active_df.shape[0] if not include_nonaktif else df_latest['is_nonaktif'].sum()),
+            'total_sisa_pinjaman_aktif': float(active_df['sisapinjaman'].sum()),
+            'avg_npl_aktif': float(active_df['npl_ratio'].mean()) if not active_df.empty else 0.0,
+            'avg_collection_rate_aktif': float(active_df['collection_rate'].mean()) if not active_df.empty else 0.0,
+        }
     })
 
 
@@ -179,6 +279,7 @@ def ksu_trend():
     - date_to: end date (YYYY-MM-DD)
     - branch_code: filter by specific branch
     - granularity: day, week, month (default: month)
+    - include_nonaktif: true/false (default: false)
     - metrics: comma-separated metrics (default: all)
     """
     df = get_ksu_df()
@@ -191,13 +292,26 @@ def ksu_trend():
     date_to = request.args.get('date_to')
     branch_code = request.args.get('branch_code')
     granularity = request.args.get('granularity', 'month')
+    include_nonaktif = request.args.get('include_nonaktif', 'false').lower() == 'true'
     
     if date_from:
-        df = df[df['tglnominatif'] >= pd.to_datetime(date_from)]
+        df = df[df['tglnominatif'] >= parse_day_start(date_from)]
     if date_to:
-        df = df[df['tglnominatif'] <= pd.to_datetime(date_to)]
+        df = df[df['tglnominatif'] <= parse_day_end(date_to)]
     if branch_code:
         df = df[df['kode'].str.upper() == branch_code.upper()]
+
+    if df.empty:
+        return jsonify({'error': 'No data available'}), 404
+
+    if not include_nonaktif:
+        latest_df = latest_branch_snapshot(df)
+        latest_df['npl_ratio'] = (latest_df['sisapinjamannp'] / latest_df['sisapinjaman'] * 100).fillna(0)
+        ref_date = parse_day_end(date_to) if date_to else df['tglnominatif'].max()
+        latest_df = annotate_branch_status(latest_df, ref_date)
+        active_codes = latest_df.loc[~latest_df['is_nonaktif'], 'kode'].tolist()
+        if active_codes:
+            df = df[df['kode'].isin(active_codes)]
     
     # Group by time period
     if granularity == 'day':
@@ -267,16 +381,21 @@ def branch_detail(branch_code):
     date_to = request.args.get('date_to')
     
     if date_from:
-        df_branch = df_branch[df_branch['tglnominatif'] >= pd.to_datetime(date_from)]
+        df_branch = df_branch[df_branch['tglnominatif'] >= parse_day_start(date_from)]
     if date_to:
-        df_branch = df_branch[df_branch['tglnominatif'] <= pd.to_datetime(date_to)]
+        df_branch = df_branch[df_branch['tglnominatif'] <= parse_day_end(date_to)]
     
+    if df_branch.empty:
+        return jsonify({'error': f'No data available for branch {branch_code} in selected range'}), 404
+
+    branch_daily = aggregate_branch_history(df_branch)
+
     # Get latest data
-    latest = df_branch.sort_values('tglnominatif').iloc[-1]
+    latest = branch_daily.iloc[-1]
     
     # Get historical trend
     history = []
-    for _, row in df_branch.sort_values('tglnominatif').iterrows():
+    for _, row in branch_daily.iterrows():
         history.append({
             'tanggal': row['tglnominatif'].strftime('%Y-%m-%d'),
             'pinjaman': float(row['pinjaman']),
@@ -289,6 +408,15 @@ def branch_detail(branch_code):
     # Calculate statistics
     npl_ratio = (latest['sisapinjamannp'] / latest['sisapinjaman'] * 100) if latest['sisapinjaman'] > 0 else 0
     collection_rate = ((latest['pinjaman'] - latest['sisapinjaman']) / latest['pinjaman'] * 100) if latest['pinjaman'] > 0 else 0
+    reference_date = parse_day_end(date_to) if date_to else df['tglnominatif'].max()
+    days_since_update = int((reference_date.normalize() - latest['tglnominatif'].normalize()).days)
+    is_nonaktif = days_since_update >= 7 or npl_ratio >= 99.999
+
+    reason_parts = []
+    if days_since_update >= 7:
+        reason_parts.append(f"tidak ada update {days_since_update} hari")
+    if npl_ratio >= 99.999:
+        reason_parts.append("NPL 100%")
     
     detail = {
         'kode': latest['kode'],
@@ -304,18 +432,22 @@ def branch_detail(branch_code):
             'jasa_ttg_np': float(latest['jasattgnp']),
             'total_jasa_ttg': float(latest['totaljasattg']),
             'sisa_pinjaman_np': float(latest['sisapinjamannp']),
+            'jasa_ttg_ratio': float((latest['totaljasattg'] / latest['sisapinjaman'] * 100) if latest['sisapinjaman'] > 0 else 0),
             'saldo_kas': float(latest['saldokas']),
             'saldo_bank': float(latest['saldobank']),
             'npl_ratio': float(npl_ratio),
-            'collection_rate': float(collection_rate)
+            'collection_rate': float(collection_rate),
+            'is_nonaktif': bool(is_nonaktif),
+            'nonaktif_reason': '; '.join(reason_parts),
+            'days_since_update': days_since_update,
         },
         'history': history,
         'statistics': {
-            'avg_pinjaman': float(df_branch['pinjaman'].mean()),
-            'max_pinjaman': float(df_branch['pinjaman'].max()),
-            'min_pinjaman': float(df_branch['pinjaman'].min()),
-            'avg_npl_ratio': float((df_branch['sisapinjamannp'] / df_branch['sisapinjaman'] * 100).mean()),
-            'data_points': len(df_branch)
+            'avg_pinjaman': float(branch_daily['pinjaman'].mean()),
+            'max_pinjaman': float(branch_daily['pinjaman'].max()),
+            'min_pinjaman': float(branch_daily['pinjaman'].min()),
+            'avg_npl_ratio': float((branch_daily['sisapinjamannp'] / branch_daily['sisapinjaman'] * 100).mean()),
+            'data_points': len(branch_daily)
         }
     }
     
@@ -329,6 +461,7 @@ def npl_ranking():
     Query params:
     - date: specific date (YYYY-MM-DD), default to latest
     - limit: number of results (default: 10)
+    - include_nonaktif: true/false (default: false)
     """
     df = get_ksu_df()
     
@@ -338,18 +471,24 @@ def npl_ranking():
     # Get date parameter
     date_param = request.args.get('date')
     limit = int(request.args.get('limit', 10))
+    include_nonaktif = request.args.get('include_nonaktif', 'false').lower() == 'true'
     
     if date_param:
-        target_date = pd.to_datetime(date_param)
+        target_date = parse_day_end(date_param)
         df_filtered = df[df['tglnominatif'] <= target_date]
         if df_filtered.empty:
             return jsonify({'ranking': [], 'total': 0}), 200
-        df_latest = df_filtered.sort_values('tglnominatif').groupby('kode').last().reset_index()
+        df_latest = latest_branch_snapshot(df_filtered)
     else:
-        df_latest = df.sort_values('tglnominatif').groupby('kode').last().reset_index()
+        df_latest = latest_branch_snapshot(df)
     
     # Calculate NPL ratio
     df_latest['npl_ratio'] = (df_latest['sisapinjamannp'] / df_latest['sisapinjaman'] * 100).fillna(0)
+
+    if not include_nonaktif:
+        ref_date = parse_day_end(date_param) if date_param else df['tglnominatif'].max()
+        df_latest = annotate_branch_status(df_latest, ref_date)
+        df_latest = df_latest[~df_latest['is_nonaktif']]
     
     # Sort and limit
     df_ranked = df_latest.sort_values('npl_ratio', ascending=False).head(limit)
@@ -390,14 +529,14 @@ def summary_report():
     # Get date parameter
     date_param = request.args.get('date')
     if date_param:
-        target_date = pd.to_datetime(date_param)
+        target_date = parse_day_end(date_param)
         df_filtered = df[df['tglnominatif'] <= target_date]
         if df_filtered.empty:
             return jsonify({'error': 'No data available for specified date'}), 404
-        df_latest = df_filtered.sort_values('tglnominatif').groupby('kode').last().reset_index()
+        df_latest = latest_branch_snapshot(df_filtered)
         report_date = target_date.strftime('%d %B %Y')
     else:
-        df_latest = df.sort_values('tglnominatif').groupby('kode').last().reset_index()
+        df_latest = latest_branch_snapshot(df)
         report_date = df['tglnominatif'].max().strftime('%d %B %Y')
     
     # Calculate all metrics
@@ -482,13 +621,13 @@ def branch_comparison():
     # Get date parameter
     date_param = request.args.get('date')
     if date_param:
-        target_date = pd.to_datetime(date_param)
+        target_date = parse_day_end(date_param)
         df_filtered = df[df['tglnominatif'] <= target_date]
         if df_filtered.empty:
             return jsonify({'comparison': [], 'total': 0}), 200
-        df_latest = df_filtered.sort_values('tglnominatif').groupby('kode').last().reset_index()
+        df_latest = latest_branch_snapshot(df_filtered)
     else:
-        df_latest = df.sort_values('tglnominatif').groupby('kode').last().reset_index()
+        df_latest = latest_branch_snapshot(df)
     
     # Filter by specified branches
     df_comparison = df_latest[df_latest['kode'].str.upper().isin(branch_codes)]
